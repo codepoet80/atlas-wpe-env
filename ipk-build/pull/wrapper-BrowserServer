@@ -80,6 +80,13 @@ export WEBKIT_NICOSIA_PAINTING_THREADS=2   # use BOTH cores for Cairo/Nicosia ti
                                            # otherwise idle while BS blocks on the GPU readback, so it overlaps
                                            # cleanly (readback ticks up only ~50ms from contention; net win).
 export MALLOC_ARENA_MAX=2                  # cap glibc per-thread arenas (GStreamer/fontconfig side)
+export BPWPE_PRESPAWN=1                     # Warm the WebProcess with about:blank at card-open (attachToBuffer)
+                                           # rather than on the first openUrl, so the ~3-4s WebProcess cold
+                                           # spawn (map 67MB libWPEWebKit + JSC/bundle init) overlaps the
+                                           # "open Atlas -> start page -> type URL" gap. The warm process is
+                                           # reused for the real navigation and REAPED on card close, so it
+                                           # costs no idle memory when Atlas isn't open. BS itself is a boot
+                                           # service (always up); this only moves the WebProcess spawn earlier.
 export BPWPE_NO_STRIP=1                    # DISABLE the P2 scroll-strip readback — correct for the TALL pan
                                            # buffer (default mult=4): on a fling the recenter always jumps
                                            # ~slack/2 (delta ~960-1400px), so the "strip" is ~1/3-1/2 the
