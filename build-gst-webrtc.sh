@@ -3,7 +3,7 @@
 # plugins. Builds into staging only (NO device deploy here — deploy is a separate step verified against the
 # existing plugin set). Needs OpenSSL 3 (done) for libnice DTLS + gst dtls plugin.
 set -u
-WPE=/home/herrie/webos/wpe; L=$WPE/logs
+WPE="${WPE:-$HOME/webos/wpe}"; L=$WPE/logs
 . "${WPE_ENV:-$WPE/env-glibc-gcc125.sh}"; S="$STAGING"
 CROSS="$WPE/meson-cross-glibc-gcc125.txt"
 export PKG_CONFIG_PATH="$S/lib/pkgconfig"

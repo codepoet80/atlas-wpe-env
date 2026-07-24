@@ -4,7 +4,7 @@
 # doesn't link OpenSSL today (soup=GnuTLS) so there's no conflict. Installs into staging; backs up the 1.1
 # headers/.pc/.a first (the .so.1.1 files are name-distinct and survive).
 set -u
-WPE=/home/herrie/webos/wpe; L=$WPE/logs
+WPE="${WPE:-$HOME/webos/wpe}"; L=$WPE/logs
 . "${WPE_ENV:-$WPE/env-glibc-gcc125.sh}"; S="$STAGING"
 unset CC CXX AR RANLIB STRIP LD CFLAGS CXXFLAGS CPPFLAGS LDFLAGS
 V=3.0.16

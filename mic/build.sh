@@ -14,15 +14,15 @@ HERE=$(cd "$(dirname "$0")" && pwd); cd "$HERE"
 # pattern the BrowserServer uses to link LunaService (device liblunaservice was built for glib
 # 2.16 but glib keeps ABI back-compat, so it runs fine against the atlas glib 2.70).  qmicd runs
 # under the atlas LD_LIBRARY_PATH ($D/lib for glib + /usr/lib for the system liblunaservice).
-WPE=/home/herrie/webos/wpe
-DS=/home/herrie/webos/touchpad-kernel/doctor305
+WPE="${WPE:-$HOME/webos/wpe}"
+DS="${DS:-$HOME/webos/touchpad-kernel/doctor305}"
 . $WPE/env-glibc-gcc125.sh 2>/dev/null
 STAGING=${STAGING:-$WPE/staging-glibc-252}
 
 # --- 1) qmicd: LunaService client + glib main loop ---
 # lunaservice.h: use the clean luna-service2 header (no legacy <json.h>/<winsock2.h> drag-in);
 # the device liblunaservice.so exports all the LS* symbols qmicd uses (verified via readelf).
-SI=/home/herrie/tap2shared-re/src/webos_headers
+SI="${SI:-$HOME/tap2shared-re/src/webos_headers}"
 DEVLIB=$WPE/browserserver-wpe/devlib         # liblunaservice.so (-> device /usr/lib)
 GLIB_CF=$(pkg-config --cflags glib-2.0 gio-2.0)
 GLIB_LIBS=$(pkg-config --libs   glib-2.0 gio-2.0)

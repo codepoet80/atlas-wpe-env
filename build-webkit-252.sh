@@ -5,7 +5,7 @@
 # libsoup3 built with gcc-12.5). The tree at build/wpewebkit-2.52.4 carries our single-process patch
 # (WebKitWebContext.cpp) — so this script does NOT re-extract. $1=configure|build.
 set -u
-WPE=/home/herrie/webos/wpe; L=$WPE/logs
+WPE="${WPE:-$HOME/webos/wpe}"; L=$WPE/logs
 . "${WPE_ENV:-$WPE/env-glibc-gcc125.sh}"; S="$STAGING"
 V=2.52.4
 STAGE=${1:-configure}

@@ -12,7 +12,7 @@
 # staging/lib/*.so + the whole gstreamer-1.0/ dir), so the restore/ipk include them with no further edits.
 # Deploy to a running device separately (see tail of this script / redeploy-webrtc.sh pattern).
 set -u
-WPE=/home/herrie/webos/wpe; L=$WPE/logs; mkdir -p "$L"
+WPE="${WPE:-$HOME/webos/wpe}"; L=$WPE/logs; mkdir -p "$L"
 . "${WPE_ENV:-$WPE/env-glibc-gcc125.sh}"          # TARGET, CC, STAGING
 S="$STAGING"
 CROSS="$WPE/meson-cross-glibc-gcc125.txt"

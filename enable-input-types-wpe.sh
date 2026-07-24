@@ -5,7 +5,7 @@
 # WebKit rebuild bakes them on (DEFAULT_VALUE_FOR_InputTypeDateEnabled std::true_type{}). Idempotent.
 # (BrowserServer also toggles them at runtime via the WebKitFeature list as a backup — atlas-wpe-backend.)
 set -u
-Y="${1:-/home/herrie/webos/wpe/build/wpewebkit-2.52.4/Source/WTF/Scripts/Preferences/UnifiedWebPreferences.yaml}"
+Y="${1:-${WPE:-$HOME/webos/wpe}/build/wpewebkit-2.52.4/Source/WTF/Scripts/Preferences/UnifiedWebPreferences.yaml}"
 python3 - "$Y" <<'PY'
 import sys
 Y=sys.argv[1]; lines=open(Y).read().split("\n")
