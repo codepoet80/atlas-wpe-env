@@ -14,7 +14,9 @@
 #   ./stage-sysroot-atlas.sh headers    # network only, no device needed
 #   ./stage-sysroot-atlas.sh device     # needs a TouchPad running Atlas, over novacom
 #   ./stage-sysroot-atlas.sh linklib    # derives linklib/ + dev symlinks from lib/ (run after `device`)
-#   ./stage-sysroot-atlas.sh all        # all three, in order
+#   ./stage-sysroot-atlas.sh webkit-deps # dev headers + .pc for building WebKit itself (network)
+#   ./stage-sysroot-atlas.sh all        # headers + device + linklib
+#   ./stage-sysroot-atlas.sh everything # ... plus webkit-deps
 #
 # Overridable:
 #   STAGING     sysroot to build            (default $HOME/atlas-staging)
@@ -212,11 +214,95 @@ libresolv.so*|librt.so*|libstdc++.so*) continue;;
   echo "   linklib: $(ls "$STAGING/linklib" | wc -l) entries (lib/: $(ls "$STAGING/lib" | wc -l))"
 }
 
+# ---------------------------------------------------------------------------------------------------
+# webkit-deps  — headers + .pc files for building WPE WebKit itself
+# ---------------------------------------------------------------------------------------------------
+# Building WebKit needs dev headers and pkg-config files for ~40 libraries. We do NOT build those
+# libraries: the engine links the ones the device already ships, so the headers only have to match
+# their sonames. Versions are pinned in webkitdeps.list (see the notes in that file — ICU in
+# particular MUST be 70.x or nothing links).
+#
+# An unprivileged apt root lets us pull armhf packages from three suites at once without touching
+# the host system, and without hand-constructing pool URLs for 65 packages.
+do_webkit_deps(){
+  local WD="$STAGING/webkitdeps"
+  local APTROOT="${APTROOT:-$STAGING/.apt}"
+  local LIST="$SCRIPT_DIR/webkitdeps.list"
+  [ -f "$LIST" ] || die "missing $LIST"
+  command -v apt-get >/dev/null || die "apt-get required (Debian/Ubuntu host)"
+
+  echo "== webkit-deps: unprivileged apt root =="
+  rm -rf "$APTROOT"
+  mkdir -p "$APTROOT"/{etc/apt/apt.conf.d,etc/apt/preferences.d,var/lib/apt/lists/partial,var/lib/dpkg,var/cache/apt/archives/partial}
+  : > "$APTROOT/var/lib/dpkg/status"
+  cat > "$APTROOT/etc/apt/sources.list" <<'EOF'
+deb [arch=armhf trusted=yes] http://deb.debian.org/debian bookworm main
+deb [arch=armhf trusted=yes] http://deb.debian.org/debian trixie main
+deb [arch=armhf trusted=yes] http://ports.ubuntu.com/ubuntu-ports jammy main universe
+EOF
+  cat > "$APTROOT/etc/apt/apt.conf" <<EOF
+Dir "$APTROOT";
+Dir::State "$APTROOT/var/lib/apt";
+Dir::State::status "$APTROOT/var/lib/dpkg/status";
+Dir::Cache "$APTROOT/var/cache/apt";
+Dir::Etc "$APTROOT/etc/apt";
+APT::Architecture "armhf";
+APT::Architectures { "armhf"; };
+Acquire::Languages "none";
+EOF
+  export APT_CONFIG="$APTROOT/etc/apt/apt.conf"
+  ( cd "$APTROOT" && apt-get update >/dev/null 2>&1 ) || die "apt-get update failed"
+
+  echo "== webkit-deps: fetching pinned packages =="
+  mkdir -p "$APTROOT/debs"
+  local n=0
+  while IFS='|' read -r pkgver sha; do
+    case "$pkgver" in ''|'#'*) continue;; esac
+    local pkg="${pkgver%%=*}"
+    # apt-get download aborts the WHOLE batch on one bad name, so fetch one at a time and report.
+    if ! ( cd "$APTROOT/debs" && apt-get download "$pkgver" >/dev/null 2>&1 ); then
+      die "could not fetch $pkgver (archive may have superseded it; update webkitdeps.list)"
+    fi
+    local f; f=$(ls "$APTROOT/debs/${pkg}"_*.deb 2>/dev/null | head -1)
+    [ -n "$f" ] || die "download reported success but no .deb for $pkg"
+    if [ -n "$sha" ] && [ "$(sha256sum "$f" | cut -d' ' -f1)" != "$sha" ]; then
+      die "sha256 MISMATCH for $pkg (expected $sha)"
+    fi
+    n=$((n+1))
+  done < "$LIST"
+  echo "   fetched + verified $n packages"
+
+  echo "== webkit-deps: extracting (never installing) =="
+  rm -rf "$WD"; mkdir -p "$WD"
+  for d in "$APTROOT"/debs/*.deb; do dpkg-deb -x "$d" "$WD"; done
+
+  # The -dev packages ship libX.so symlinks pointing at runtime libs that live in the (uninstalled)
+  # runtime packages, so every one of them dangles. Repoint each at the real library the DEVICE ships,
+  # so -l resolves against the engine's actual ABI rather than a Debian build of the same library.
+  echo "== webkit-deps: repointing dev symlinks at the device libraries =="
+  local L="$WD/usr/lib/arm-linux-gnueabihf" fixed=0 miss=""
+  for f in "$L"/*.so; do
+    [ -L "$f" ] || continue
+    readlink -e "$f" >/dev/null && continue
+    local tgt base alt; tgt=$(readlink "$f"); base=$(basename "$f" .so)
+    if [ -e "$STAGING/lib/$tgt" ]; then ln -sfn "$STAGING/lib/$tgt" "$f"; fixed=$((fixed+1))
+    else
+      alt=$(ls "$STAGING/lib/$base".so.* 2>/dev/null | head -1)
+      if [ -n "$alt" ]; then ln -sfn "$alt" "$f"; fixed=$((fixed+1)); else miss="$miss $base"; fi
+    fi
+  done
+  echo "   repointed $fixed;  no device lib for:$miss"
+  echo "   (gstgl/opencv/va/wayland and GL/GLESv1_CM are expected here — the engine ships none of them)"
+  echo "== webkit-deps: done -> $WD =="
+}
+
 case "${1:-all}" in
   headers) do_headers;;
   device)  do_device;;
-  linklib) do_linklib;;
-  all)     do_headers; do_device; do_linklib;;
-  *)       die "usage: $(basename "$0") [headers|device|linklib|all]";;
+  linklib)     do_linklib;;
+  webkit-deps) do_webkit_deps;;
+  all)         do_headers; do_device; do_linklib;;
+  everything)  do_headers; do_device; do_linklib; do_webkit_deps;;
+  *)       die "usage: $(basename "$0") [headers|device|linklib|webkit-deps|all|everything]";;
 esac
 echo "== staging sysroot ready: $STAGING =="

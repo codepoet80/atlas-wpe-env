@@ -1,0 +1,26 @@
+--- a/Source/ThirdParty/libsysprof-capture/sysprof-platform.c
++++ b/Source/ThirdParty/libsysprof-capture/sysprof-platform.c
+@@ -56,6 +56,7 @@
+ 
+ #include "config.h"
+ 
++#include <fcntl.h>
+ #include <stdio.h>
+ #include <stdlib.h>
+ #include <sys/syscall.h>
+@@ -64,6 +65,15 @@
+ #include "sysprof-capture-util-private.h"
+ #include "sysprof-platform.h"
+ 
++/* The mkostemp() fallback below is only compiled when the kernel headers predate memfd_create()
++ * (Linux 3.17). Everywhere modern that branch is dead, which is why it can reference O_BINARY and
++ * O_CLOEXEC without including <fcntl.h> and nobody notices. Atlas builds against 2.6.32 headers for
++ * the TouchPad's 2.6.35 kernel, so the fallback is the live path here. O_BINARY is a Windows-ism with
++ * no meaning on POSIX; upstream sysprof defines it to 0 for exactly this reason. */
++#ifndef O_BINARY
++# define O_BINARY 0
++#endif
++
+ #ifndef __NR_memfd_create
+ static const char *
+ get_tmpdir (void)
