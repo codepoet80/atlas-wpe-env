@@ -25,6 +25,21 @@
 # WebDriver OFF. An earlier pass here used the plain-name grep and wrongly concluded ServiceWorker and
 # EncryptedMedia were off.
 #
+# TWO SETTINGS THAT LOOK REDUNDANT BUT ARE NOT:
+#
+# FREETYPE_WOFF2_SUPPORT_IS_AVAILABLE=OFF - WebKit probes whether FreeType can decompress WOFF2 and,
+#   if so, turns USE_WOFF2 back off and relies on FreeType instead. Cross-compiling, that probe
+#   compiles against the DEBIAN FreeType headers we staged, which do have WOFF2 - but the FreeType the
+#   DEVICE ships does not (its NEEDED is just libpthread/libc, no brotli). Left alone, the build
+#   silently drops libwoff2dec and every WOFF2 web font fails at runtime. The shipped engine links
+#   libwoff2dec, which is the giveaway. Forcing the probe off restores that.
+#
+# USE_GSTREAMER_MPEGTS=ON - defaults OFF, but the shipped engine links libgstmpegts-1.0. Needed for
+#   AAC-in-MPEG-TS (and the HLS path).
+#
+# Both were found by diffing our libWPEWebKit's NEEDED list against the shipped one; do that after any
+# change here, it catches this class of silent feature loss.
+#
 # Overridable: WK_SRC, STAGING, PREFIX, JOBS.
 set -eu
 
@@ -83,10 +98,11 @@ configure)
     -DENABLE_WEBASSEMBLY=ON -DENABLE_SAMPLING_PROFILER=OFF \
     -DENABLE_VIDEO=ON -DENABLE_WEB_AUDIO=ON -DENABLE_MEDIA_SOURCE=ON \
     -DENABLE_MEDIA_STREAM=ON -DENABLE_WEB_RTC=ON -DUSE_GSTREAMER_WEBRTC=ON \
-    -DUSE_GSTREAMER=ON -DUSE_GSTREAMER_GL=OFF \
+    -DUSE_GSTREAMER=ON -DUSE_GSTREAMER_GL=OFF -DUSE_GSTREAMER_MPEGTS=ON \
     -DENABLE_WEBGL=ON -DENABLE_WEBGL2=ON \
     -DENABLE_SPEECH_SYNTHESIS=ON \
-    -DUSE_WOFF2=ON -DUSE_AVIF=ON -DUSE_JPEGXL=ON -DUSE_LCMS=OFF -DUSE_OPENJPEG=OFF \
+    -DUSE_WOFF2=ON -DFREETYPE_WOFF2_SUPPORT_IS_AVAILABLE=OFF \
+    -DUSE_AVIF=ON -DUSE_JPEGXL=ON -DUSE_LCMS=OFF -DUSE_OPENJPEG=OFF \
     -DENABLE_GAMEPAD=ON -DENABLE_PAYMENT_REQUEST=ON -DENABLE_OFFSCREEN_CANVAS=ON \
     -DENABLE_SERVICE_WORKER=ON -DENABLE_WEBDRIVER=OFF -DENABLE_ENCRYPTED_MEDIA=ON \
     -DENABLE_THUNDER=OFF -DENABLE_WEBXR=OFF -DENABLE_MINIBROWSER=OFF \
