@@ -83,16 +83,24 @@ configure)
   ;;
 build)
   [ -d "$BUILD" ] || die "not configured — run '$0 configure' first"
+  # Refuse to start on top of a running build. Two ninjas sharing one log interleave their writes at
+  # independent file offsets, which produces a log full of NUL padding where the errors should be and
+  # makes a live build look like a mysterious failure.
+  if pgrep -x ninja >/dev/null 2>&1; then
+    die "a ninja is already running — wait for it, or stop it first (pgrep -x ninja)"
+  fi
   cd "$BUILD"
-  echo "== ninja -j$JOBS  (log: $LOGDIR/build.log) =="
+  LOG="$LOGDIR/build.log"
+  [ -e "$LOG" ] && mv -f "$LOG" "$LOG.prev"     # keep the previous run instead of clobbering it
+  echo "== ninja -j$JOBS  (log: $LOG) =="
   set +e
-  nice -n 10 ninja -j"$JOBS" > "$LOGDIR/build.log" 2>&1
+  nice -n 10 ninja -j"$JOBS" > "$LOG" 2>&1
   rc=$?
   set -e
   echo "== ninja rc=$rc =="
-  [ "$rc" = 0 ] || { grep -E "error:|FAILED" "$LOGDIR/build.log" | head -30; exit $rc; }
+  [ "$rc" = 0 ] || { grep -E "error:|FAILED" "$LOG" | head -30; exit $rc; }
   rm -rf "$DESTROOT"
-  DESTDIR="$DESTROOT" ninja install >> "$LOGDIR/build.log" 2>&1
+  DESTDIR="$DESTROOT" ninja install >> "$LOG" 2>&1
   echo "== installed into $DESTROOT$PREFIX =="
   ls -la "$DESTROOT$PREFIX/lib/" 2>/dev/null | head
   ;;

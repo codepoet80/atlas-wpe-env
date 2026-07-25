@@ -1,0 +1,20 @@
+--- a/Source/JavaScriptCore/runtime/MathCommon.cpp
++++ b/Source/JavaScriptCore/runtime/MathCommon.cpp
+@@ -604,7 +604,16 @@
+     return std::nearbyint(operand);
+ }
+ 
+-#if (OS(LINUX) && !defined(__GLIBC__)) || OS(HAIKU)
++// roundeven()/roundevenf() are C23 and only appeared in glibc 2.25. Upstream's guard assumes any glibc
++// has them and only compiles these fallbacks for non-glibc Linux (musl) and Haiku. The Atlas engine
++// targets the TouchPad's bundled glibc 2.23, so we need them there too.
++#if defined(__GLIBC__) && defined(__GLIBC_PREREQ)
++#if !__GLIBC_PREREQ(2, 25)
++#define ATLAS_NEEDS_ROUNDEVEN_FALLBACK 1
++#endif
++#endif
++
++#if (OS(LINUX) && !defined(__GLIBC__)) || OS(HAIKU) || defined(ATLAS_NEEDS_ROUNDEVEN_FALLBACK)
+ static inline float roundevenf(float operand)
+ {
+     float rounded = roundf(operand);

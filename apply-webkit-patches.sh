@@ -34,6 +34,7 @@ $SCRIPT_DIR/wpe-$V-atlas-webrtc-sendpath-ssrc.patch
 $SCRIPT_DIR/wpe-$V-atlas-webrtc-mono-opus.patch
 $SCRIPT_DIR/wpe-$V-atlas-mediastream-camera.patch
 $SCRIPT_DIR/wpe-$V-atlas-sysprof-oldkernel-fcntl.patch
+$SCRIPT_DIR/wpe-$V-atlas-glibc223-roundeven.patch
 "
 
 die(){ echo "apply-webkit-patches: $*" >&2; exit 1; }
