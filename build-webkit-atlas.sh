@@ -41,7 +41,7 @@ STAGING="${STAGING:-$HOME/atlas-staging}"
 # compiler bug. Budget ~3 GB per job and cap at the core count.
 if [ -z "${JOBS:-}" ]; then
   _mem_gb=$(awk '/MemTotal/ {printf "%d", $2/1024/1024}' /proc/meminfo 2>/dev/null || echo 8)
-  _by_mem=$(( _mem_gb / 3 )); [ "$_by_mem" -lt 1 ] && _by_mem=1
+  _by_mem=$(( _mem_gb / 4 )); [ "$_by_mem" -lt 1 ] && _by_mem=1
   _cores=$(nproc)
   JOBS=$(( _by_mem < _cores ? _by_mem : _cores ))
 fi
