@@ -9,7 +9,7 @@ set -e
 # Capture the deploy-strip flag BEFORE sourcing the env — the toolchain env exports STRIP=<strip-binary>
 # (autotools convention), which would clobber a command-line STRIP=1. DOSTRIP holds our intent.
 DOSTRIP="${STRIP:-0}"
-WPE=/home/herrie/webos/wpe
+WPE="${WPE:-$HOME/webos/wpe}"
 . "${WPE_ENV:-$WPE/env-glibc-gcc125.sh}"
 B="$WPE/build/wpewebkit-2.52.4/_b"
 DEV=/media/cryptofs/apps/usr/palm/applications/org.webosports.app.atlas/deviceroot/wpe-252
@@ -31,9 +31,9 @@ if [ "$DOSTRIP" = "1" ]; then
   "$STRIP" --strip-unneeded "$TMP"
   echo "  stripped deploy copy -> $(stat -c%s "$TMP") bytes"
 fi
-python3 - "$TMP" <<'PY'
+ATLAS_HOST_PREFIX="${STAGING:-$WPE/staging-glibc-252}" python3 - "$TMP" <<'PY'
 import sys
-host=b'/home/herrie/webos/wpe/staging-glibc-252'
+import os; host=os.environ['ATLAS_HOST_PREFIX'].encode()
 dev=b'/var/atlas252'
 pad=b''
 while len(dev+pad)<len(host): pad+=b'/.'

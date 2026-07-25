@@ -9,12 +9,12 @@
 # - Stripped to slim the push.
 # - Preserves the WebKit install subdirs (libexec/wpe-webkit-2.0, lib/wpe-webkit-2.0/injected-bundle).
 # - Binary-patches the baked install prefix: device / is read-only and no WEBKIT_EXEC_PATH override exists,
-#   so the 36-char host prefix /home/herrie/webos/wpe/staging-glibc is rewritten IN-PLACE to the device
+#   so the baked host prefix ($STAGING, i.e. $WPE/staging-glibc-252) is rewritten IN-PLACE to the device
 #   path padded to the SAME length with /. no-op components, so all baked paths resolve on-device.
 # - EGL/GLESv2 sonames are staged at runtime by run.sh (copy of the device's real /usr/lib drivers).
 set -e
-WPE=/home/herrie/webos/wpe; . "${WPE_ENV:-$WPE/env-glibc.sh}"
-GSR=$HOME/x-tools/arm-unknown-linux-gnueabi-gcc125/arm-unknown-linux-gnueabi/sysroot
+WPE="${WPE:-$HOME/webos/wpe}"; . "${WPE_ENV:-$WPE/env-glibc.sh}"
+GSR="${GSR:-$(ls -d "$HOME"/x-tools/*/*/sysroot 2>/dev/null | head -1)}"
 OUT="${DEPLOY_OUT:-$WPE/deploy-glibc}"
 # Engine runs from the app's cryptofs deviceroot. Interp/rpath (patchelf, no length limit) use the FULL
 # cryptofs path; the baked-string prefix-patch below is length-limited to the host prefix, so it uses the
@@ -58,11 +58,11 @@ for b in "$OUT/frame-dump" "$OUT/libexec/wpe-webkit-2.0/WPEWebProcess" "$OUT/lib
 done
 
 # 6. binary-patch the baked host prefix -> device prefix padded to the same length with /. no-ops
-python3 - "$OUT" <<'PY'
+ATLAS_HOST_PREFIX="${STAGING:-$WPE/staging-glibc-252}" python3 - "$OUT" <<'PY'
 import sys, os, glob
 OUT = sys.argv[1]
 import os as _os
-host = b'/home/herrie/webos/wpe/staging-glibc-252'
+host = os.environ['ATLAS_HOST_PREFIX'].encode()   # the staging prefix baked at build (== builder's $WPE/staging-glibc-252)
 dev  = _os.environ.get('PREFIX_LINK', '/var/atlas252').encode()   # short symlink -> cryptofs deviceroot/wpe-252
 pad = b''
 while len(dev + pad) < len(host): pad += b'/.'

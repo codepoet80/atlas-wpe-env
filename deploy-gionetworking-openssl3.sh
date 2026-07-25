@@ -2,7 +2,7 @@
 # Deploy the OpenSSL-3-linked libgioopenssl.so (fixes the SSL_R_DH_LIB HTTPS-DHE failure) and verify.
 # After this, libssl.so.1.1/libcrypto.so.1.1 are no longer NEEDed -> process runs a single OpenSSL (3.0).
 set -u
-WPE=/home/herrie/webos/wpe; S=$WPE/staging-glibc-252
+WPE="${WPE:-$HOME/webos/wpe}"; S=$WPE/staging-glibc-252
 DEV=/media/cryptofs/apps/usr/palm/applications/org.webosports.app.atlas/deviceroot/wpe-252
 put(){ echo "  put $(basename "$2") ($(stat -c%s "$1") b)"; novacom put file://"$2" < "$1" || { echo "  !! put failed: $2"; return 1; }; }
 

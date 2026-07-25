@@ -10,14 +10,14 @@
 #              STRIP=0 ./full-restore-atlas.sh    (keep libWPEWebKit unstripped for gdb, ~2x push)
 #   Then push: see full-restore-push.sh
 set -eu
-WPE=/home/herrie/webos/wpe
+WPE="${WPE:-$HOME/webos/wpe}"
 . "${WPE_ENV:-$WPE/env-glibc-gcc125.sh}"        # TARGET, CC, STAGING(=staging-glibc-252)
 S="$STAGING"
-ENV=/home/herrie/Documents/GitHub/atlas-wpe-env
-GSR=$HOME/x-tools/arm-unknown-linux-gnueabi-gcc125/arm-unknown-linux-gnueabi/sysroot
+ENV="${ENV:-$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)}"   # this repo (atlas-wpe-env), derived
+GSR="${GSR:-$(ls -d "$HOME"/x-tools/*/*/sysroot 2>/dev/null | head -1)}"
 OBJ=$WPE/browserserver-wpe/obj
-CAM=/home/herrie/webos/touchpad-kernel/doctor305/camera-path-a
-APPSRC=/home/herrie/Documents/GitHub/atlas-browser-app   # CURRENT front-end (features+icons), not the stale ipk
+CAM="${CAM:-${DS:-$HOME/webos/touchpad-kernel/doctor305}/camera-path-a}"
+APPSRC="${APPSRC:-$(dirname "$ENV")/atlas-browser-app}"   # CURRENT front-end (features+icons), not the stale ipk; override with APPSRC=
 ROLESRC=$ENV/roles/org.webosports.browserserver.json     # LunaService role (lost with /var on reset)
 
 APPNAME=org.webosports.app.atlas
@@ -220,10 +220,10 @@ for b in "$D/libexec/wpe-webkit-2.0/WPEWebProcess" "$D/libexec/wpe-webkit-2.0/WP
 done
 
 echo "=== 11. prefix-patch baked host prefix -> /var/atlas252 (padded to same length) ==="
-python3 - "$D" <<'PY'
+ATLAS_HOST_PREFIX="${STAGING:-$WPE/staging-glibc-252}" python3 - "$D" <<'PY'
 import sys, os, glob
 D = sys.argv[1]
-host = b'/home/herrie/webos/wpe/staging-glibc-252'
+import os; host = os.environ['ATLAS_HOST_PREFIX'].encode()
 dev  = b'/var/atlas252'
 pad = b''
 while len(dev + pad) < len(host): pad += b'/.'

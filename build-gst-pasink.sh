@@ -6,7 +6,7 @@
 # Uses the SYSTEM libpulse/libpulse-simple on-device (byte-identical to the rootfs copies kept here for the
 # link); reached at runtime via the wrapper's LD_LIBRARY_PATH=/usr/lib. Deploy: full-restore-atlas.sh copies it.
 set -e
-WPE=/home/herrie/webos/wpe; . "${WPE_ENV:-$WPE/env-glibc-gcc125.sh}"
+WPE="${WPE:-$HOME/webos/wpe}"; . "${WPE_ENV:-$WPE/env-glibc-gcc125.sh}"
 cd "$WPE/build/gst-pasink"
 PKGS="gstreamer-1.0 gstreamer-base-1.0 gstreamer-audio-1.0 glib-2.0 gobject-2.0"
 # pulse client headers (pa_simple) — from the pulseaudio-0.9.22 source tree kept in build/ (matches the

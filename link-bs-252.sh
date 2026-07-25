@@ -2,8 +2,8 @@
 # Relink BrowserServer-atlas from the prebuilt .o's. Single source of truth for the link line so the
 # Qt-removal audit can drop -lQt* deps here and verify 0 undefined references.
 set -e
-WPE=/home/herrie/webos/wpe
-DS=/home/herrie/webos/touchpad-kernel/doctor305
+WPE="${WPE:-$HOME/webos/wpe}"
+DS="${DS:-$HOME/webos/touchpad-kernel/doctor305}"
 STAGING=$WPE/staging-glibc-252
 OBJ=$WPE/browserserver-wpe/obj
 DEVLIB=$WPE/browserserver-wpe/devlib

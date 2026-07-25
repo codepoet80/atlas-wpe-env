@@ -12,7 +12,7 @@
 # Verified: kDafsa symbol grows 0 -> ~52KB, deployed lib 13KB -> 67KB, and on-device the
 # "no public-suffix data available" warnings drop from 64 to 0 during a real teams.microsoft.com load.
 set -eu
-WPE=/home/herrie/webos/wpe
+WPE="${WPE:-$HOME/webos/wpe}"
 . "$WPE/env-glibc-gcc125.sh"
 SRC="$WPE/build/libpsl-0.21.5"
 DR=/media/cryptofs/apps/usr/palm/applications/org.webosports.app.atlas/deviceroot

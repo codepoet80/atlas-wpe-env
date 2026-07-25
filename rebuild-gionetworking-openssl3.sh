@@ -15,7 +15,7 @@
 #
 # OpenSSL 3's RNG/crypto are proven working on this 2.6.35 kernel already (WebRTC DTLS handshake succeeds).
 set -u
-WPE=/home/herrie/webos/wpe; L="$WPE/logs"; mkdir -p "$L"
+WPE="${WPE:-$HOME/webos/wpe}"; L="$WPE/logs"; mkdir -p "$L"
 . "${WPE_ENV:-$WPE/env-glibc-gcc125.sh}"; S="$STAGING"
 CROSS="$WPE/meson-cross-glibc-gcc125.txt"
 export PKG_CONFIG_PATH="$S/lib/pkgconfig"

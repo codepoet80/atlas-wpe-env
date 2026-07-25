@@ -6,7 +6,7 @@
 #   2. gst-plugins-bad -Dsoundtouch=enabled -> libgstsoundtouch.so (provides `pitch`, `bpmdetect`)
 #   3. deploy both, clear /tmp/atlas-gstreg.bin so the plugin is rescanned.
 set -u
-WPE=/home/herrie/webos/wpe; L=$WPE/logs; mkdir -p "$L"
+WPE="${WPE:-$HOME/webos/wpe}"; L=$WPE/logs; mkdir -p "$L"
 . "${WPE_ENV:-$WPE/env-glibc-gcc125.sh}"; S="$STAGING"
 CROSS="$WPE/meson-cross-glibc-gcc125.txt"
 export PKG_CONFIG_PATH="$S/lib/pkgconfig"

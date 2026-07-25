@@ -5,7 +5,7 @@
 #   Usage: ./get-core-bt.sh            # newest core
 #          ./get-core-bt.sh <name>     # specific core file name in /media/internal/corefiles
 set -e
-WPE=/home/herrie/webos/wpe
+WPE="${WPE:-$HOME/webos/wpe}"
 B="$WPE/build/wpewebkit-2.52.4/_b"
 DEVCORES=/media/internal/corefiles
 OUT=/tmp/atlas-core; mkdir -p "$OUT"

@@ -21,7 +21,7 @@
 # Also required on device: libgstvideorate.so (see the camera fix) -- unrelated to audio but both are
 # deployed to $DR/wpe-252/lib/gstreamer-1.0/. Clear /tmp/atlas-gstreg.bin after deploying so they scan.
 set -e
-WPE=/home/herrie/webos/wpe
+WPE="${WPE:-$HOME/webos/wpe}"
 . "$WPE/env-glibc-gcc125.sh"
 GB=$WPE/build/gst-plugins-base-1.20.7
 
