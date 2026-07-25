@@ -1,0 +1,23 @@
+--- a/Source/WebCore/Modules/paymentrequest/PaymentRequest.cpp
++++ b/Source/WebCore/Modules/paymentrequest/PaymentRequest.cpp
+@@ -238,7 +238,9 @@
+ #endif
+             }
+         } else if (isUpdate == IsUpdate::No)
+-            details.shippingOptions = { { } };
++            // `= { { } }` is ambiguous to gcc 12 in C++23: the inner braces can initialise either the
++            // optional's contained Vector or the Vector's first element. Name the type instead.
++            details.shippingOptions = Vector<PaymentShippingOption> { };
+     } else if (isUpdate == IsUpdate::No)
+         details.shippingOptions = std::nullopt;
+ 
+@@ -275,7 +277,8 @@
+             serializedModifierData.append(WTF::move(serializedData));
+         }
+     } else if (isUpdate == IsUpdate::No)
+-        details.modifiers = { { } };
++        // Same gcc 12 / C++23 ambiguity as details.shippingOptions above.
++        details.modifiers = Vector<PaymentDetailsModifier> { };
+ 
+     return std::make_tuple(WTF::move(selectedShippingOption), WTF::move(serializedModifierData));
+ }

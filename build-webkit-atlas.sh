@@ -10,9 +10,20 @@
 # The feature set below is NOT guesswork and NOT the old build-webkit-252.sh (which disables video,
 # GStreamer, WebRTC and WebGL - that was an experiment, not what shipped). It is derived from the
 # SHIPPED libWPEWebKit-2.0.so.1: its 65 NEEDED libraries include the full GStreamer stack, flite,
-# libepoxy, avif/jxl/webp, woff2 and cairo, and its symbol table shows DFG JIT (343 refs, zero CLoop),
-# WebGL/WebGL2, MediaStream, RTCPeerConnection, SpeechSynthesis, WebAssembly, Gamepad and
-# PaymentRequest - but no ServiceWorker, WebDriver or EncryptedMedia.
+# libepoxy, avif/jxl/webp, woff2 and cairo, and its symbol table shows DFG JIT (343 refs, zero CLoop).
+#
+# HOW TO CHECK A FEATURE against the shipped library - this matters, because the obvious method is
+# wrong. Grepping for the interface name ("ServiceWorker", "PaymentRequest") tells you nothing: those
+# strings appear in IDL-derived name tables whether or not the feature is compiled in. Grep for the
+# GENERATED BINDING CLASS instead - JSServiceWorkerContainer, JSPaymentRequest, JSMediaKeys - which is
+# only linked in when the feature is enabled:
+#
+#     strings -a libWPEWebKit-2.0.so.1 | grep -cx JSPaymentRequest
+#
+# By that test the shipped engine has ServiceWorker, PaymentRequest, EncryptedMedia (JSMediaKeys),
+# WebGL/WebGL2, MediaStream, RTCPeerConnection, SpeechSynthesis, Gamepad and OffscreenCanvas ON, and
+# WebDriver OFF. An earlier pass here used the plain-name grep and wrongly concluded ServiceWorker and
+# EncryptedMedia were off.
 #
 # Overridable: WK_SRC, STAGING, PREFIX, JOBS.
 set -eu
@@ -67,7 +78,7 @@ configure)
     -DENABLE_SPEECH_SYNTHESIS=ON \
     -DUSE_WOFF2=ON -DUSE_AVIF=ON -DUSE_JPEGXL=ON -DUSE_LCMS=OFF -DUSE_OPENJPEG=OFF \
     -DENABLE_GAMEPAD=ON -DENABLE_PAYMENT_REQUEST=ON -DENABLE_OFFSCREEN_CANVAS=ON \
-    -DENABLE_SERVICE_WORKER=OFF -DENABLE_WEBDRIVER=OFF -DENABLE_ENCRYPTED_MEDIA=OFF \
+    -DENABLE_SERVICE_WORKER=ON -DENABLE_WEBDRIVER=OFF -DENABLE_ENCRYPTED_MEDIA=ON \
     -DENABLE_THUNDER=OFF -DENABLE_WEBXR=OFF -DENABLE_MINIBROWSER=OFF \
     -DENABLE_INTROSPECTION=OFF -DENABLE_DOCUMENTATION=OFF -DENABLE_API_TESTS=OFF \
     -DENABLE_BUBBLEWRAP_SANDBOX=OFF -DENABLE_JOURNALD_LOG=OFF -DUSE_SYSTEMD=OFF \
