@@ -93,7 +93,8 @@ The sysroot (`$STAGING`, default `~/atlas-staging`) holds the engine's **librari
 matching **dev headers** (to compile against). It is built by one script:
 
 ```sh
-atlas-wpe-env/stage-sysroot-atlas.sh all      # = headers + device + linklib
+atlas-wpe-env/stage-sysroot-atlas.sh all         # = headers + device + linklib
+atlas-wpe-env/stage-sysroot-atlas.sh everything  # ... plus webkit-deps (needed only for §8)
 ```
 
 or one phase at a time:
@@ -103,6 +104,7 @@ or one phase at a time:
 | `headers` | `include/` — pinned Debian armhf dev debs (extracted, never installed) + host Khronos/zlib + libwpe + this repo's `reconstructed-headers/` | network |
 | `device`  | `lib/` (engine runtime, `deviceroot/wpe-252/lib`) and `rootfs/` (`/usr/lib` + `/lib`, ~84 MB, for `-rpath-link`) | a TouchPad running Atlas, over novacom |
 | `linklib` | derives `linklib/` + the unversioned dev symlinks from `lib/` | — |
+| `webkit-deps` | `webkitdeps/` — 65 pinned armhf dev packages (headers + `.pc`) for building WebKit itself, §8 | network |
 
 Overridable: `STAGING`, `REPOS`, `DEB_CACHE`, `CRYPTO_DR`, `LIBWPE_TAG`.
 
@@ -281,11 +283,12 @@ DOSTRIP=0 atlas-wpe-env/build-ipk-atlas.sh    # keep symbols, for gdb
 | `BrowserServer-atlas`, `libWPEBackend-atlas.so` | **built from source here** (§5) |
 | boot wrapper, NPAPI adapter, upstart jobs, ls2 roles, `atlas-sensord`, `qspkd`, postinst/prerm | committed in this repo |
 | Enyo front-end (`appinfo`/`index.html`/`source`/`css`/`images`/`db`) | `atlas-browser-app` checkout |
-| WPE WebKit runtime (`libWPEWebKit`, `WPEWebProcess`/`WPENetworkProcess`, injected bundle), GStreamer stack, glibc-2.23 runtime, `share/`, `webkit-data`, `fonts.conf`/`gstomx.conf`, `qcamd`/`qmicd` | **`$DEVICEROOT_REF`** — a deviceroot pulled off a working device |
+| WPE WebKit (`libWPEWebKit`, `WPEWebProcess`/`WPENetworkProcess`, injected bundle) | **built from source** (§8), when a `build-webkit-atlas.sh` destroot is present |
+| GStreamer stack, glibc-2.23 runtime, `share/`, `webkit-data`, `fonts.conf`/`gstomx.conf`, `qcamd`/`qmicd` | **`$DEVICEROOT_REF`** — a deviceroot pulled off a working device |
 
-So this is not yet a from-scratch engine build: **WPE WebKit itself is still a prebuilt runtime.**
-Rebuilding it (`build-webkit-252.sh`, ~40 min, plus the `patches/`) is the remaining milestone; everything
-around it now reproduces.
+**As of 2026-07-25 WPE WebKit is also built from source** (§8) and `build-ipk-atlas.sh` ships it,
+falling back to `$DEVICEROOT_REF` only when no build is present. The final line of its output states
+which engine the package actually contains.
 
 **Get `$DEVICEROOT_REF`** — do this *before* removing the browser from a device, it is also your rollback
 artifact:
