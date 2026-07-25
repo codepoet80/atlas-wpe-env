@@ -77,12 +77,29 @@ for cpp in "$BS"/Yap/*.cpp; do
   extra=""; [ "$n" = OffscreenBuffer ] && extra="-I$S/libpng16"    # OffscreenBuffer uses libpng
   "$CXX" $ARCH $STD $DEF $INC $extra -c "$cpp" -o "$OBJ/yap_$n.o"
 done
+# WebKitSupplemental/misc: Settings.cpp calls webOS::WebSettings::initSettings()/initWebSettings()/
+# stringToBytes(). Upstream builds these from WebKitSupplemental (misc.pro) and links them in. They are
+# NOT part of BrowserServer/Src, so they must be compiled here explicitly — otherwise InitSettings()
+# calls a NULL address and BrowserServer SIGSEGVs on startup before writing a single log line.
+# These need two deviations from $DEF/$INC:
+#   - NO -DQT_NO_KEYWORDS: upstream uses Qt's `foreach` keyword.
+#   - wpe-shims FIRST on the include path: it supplies a no-op QtWebKit <qwebsettings.h> so the
+#     QtWebKit-only initWebSettings() compiles without stock QtWebKit (which lacks Palm's
+#     setPluginSupplementalPath/FullScreenEnabled) and without linking libQtWebKit. See that header.
+WKS_DEF="-DNDEBUG -D_GLIBCXX_USE_CXX11_ABI=0 -DUSE_LUNA_SERVICE -DATLAS_LUNA"
+for n in weboswebsettings webosmisc; do
+  cpp="$REPOS/WebKitSupplemental/misc/$n.cpp"
+  [ -f "$cpp" ] || { echo "   MISSING $cpp (clone isis-project/WebKitSupplemental)" >&2; exit 1; }
+  "$CXX" $ARCH $STD $WKS_DEF -I"$SCRIPT_DIR/wpe-shims" $INC -c "$cpp" -o "$OBJ/wks_$n.o"
+done
 echo "   compiled $(ls "$OBJ"/*.o | wc -l) objects"
 
 echo "== 4. link BrowserServer-atlas (bundled ld-linux + rpath; toolchain provides libc via linklib) =="
-# NOTE: --unresolved-symbols=ignore-in-object-files tolerates the still-unfinished QtWebKit hit-test/
-# settings stubs (BrowserPageWPE.h hitTest() returns {} — "QtWebKit link TBD" upstream). Those symbols
-# are never reached by a page load. Drop this flag once the de-QtWebKit work upstream is complete.
+# DANGER: --unresolved-symbols=ignore-in-object-files makes every unresolved call link to ADDRESS 0.
+# It does not fail the build — it produces a binary that SIGSEGVs (`blx 0`) the moment such a call is
+# reached. It is here only to tolerate the still-unfinished QtWebKit hit-test stubs (BrowserPageWPE.h
+# hitTest() returns {} — "QtWebKit link TBD" upstream), which no page load reaches. Step 5 below
+# enforces that nothing ELSE picks up a null call. Drop the flag once upstream finishes de-QtWebKit'ing.
 "$CXX" -o "$OBJ/BrowserServer-atlas" "$OBJ"/*.o \
   -Wl,--dynamic-linker="$DR/wpe-252/lib/ld-linux.so.3" \
   -Wl,-rpath="$DR/wpe-252/lib:$DR/atlas:/usr/lib:/lib" \
@@ -93,4 +110,25 @@ echo "== 4. link BrowserServer-atlas (bundled ld-linux + rpath; toolchain provid
   -lcjson -lmjson -laffinity -lmemchute -lPmCertificateMgr -leventreporter -lpthread -lrt -ldl \
   -Wl,-rpath-link,"$LL" -Wl,-rpath-link,"$RL/usr/lib" -Wl,-rpath-link,"$RL/lib" -Wl,-rpath-link,"$RL/usr/lib/ssl11" \
   -Wl,--unresolved-symbols=ignore-in-object-files
+echo "== 5. null-call guard =="
+# Every `blx 0` is an unresolved symbol that will SIGSEGV when reached. Only the unfinished QtWebKit
+# hit-test/cache paths are allowed to have them; anything else is a missing source file or library and
+# MUST fail the build. This exact class of bug shipped once: Settings.cpp calls
+# webOS::WebSettings::initSettings(), WebKitSupplemental/misc was never compiled in, and BrowserServer
+# SIGSEGV'd inside InitSettings() on startup with an empty log.
+ALLOWED_NULLCALL='_ZN13BrowserServer27asyncCmdGetImageInfoAtPointEP8YapProxyiii
+_ZN13BrowserServer25asyncCmdInspectUrlAtPointEP8YapProxyiii
+_ZN13BrowserServer10clearCacheEv
+_ZN11BrowserPage7hitTestEjj'
+BAD=$("${OBJDUMP:-$TARGET-objdump}" -d "$OBJ/BrowserServer-atlas" 2>/dev/null | awk '
+  /^[0-9a-f]+ </ { fn=$2; gsub(/[<>:]/,"",fn) }
+  /blx?\t0 </    { print fn }' | sort -u | grep -vxF "$ALLOWED_NULLCALL" || true)
+if [ -n "$BAD" ]; then
+  echo "   !! FATAL: calls to address 0 (unresolved symbols) in unexpected functions:" >&2
+  echo "$BAD" | sed 's/^/      /' >&2
+  echo "   !! These WILL SIGSEGV at runtime. A source file or -l library is missing from this script." >&2
+  exit 1
+fi
+echo "   OK — null calls confined to the known QtWebKit hit-test stubs"
+
 echo "== built: $OBJ/BrowserServer-atlas  ($(du -h "$OBJ/BrowserServer-atlas"|cut -f1)) =="
