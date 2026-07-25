@@ -104,6 +104,7 @@ configure)
     -DUSE_WOFF2=ON -DFREETYPE_WOFF2_SUPPORT_IS_AVAILABLE=OFF \
     -DUSE_AVIF=ON -DUSE_JPEGXL=ON -DUSE_LCMS=OFF -DUSE_OPENJPEG=OFF \
     -DENABLE_GAMEPAD=ON -DENABLE_PAYMENT_REQUEST=ON -DENABLE_OFFSCREEN_CANVAS=ON \
+    -DENABLE_DEVICE_ORIENTATION=ON \
     -DENABLE_SERVICE_WORKER=ON -DENABLE_WEBDRIVER=OFF -DENABLE_ENCRYPTED_MEDIA=ON \
     -DENABLE_THUNDER=OFF -DENABLE_WEBXR=OFF -DENABLE_MINIBROWSER=OFF \
     -DENABLE_INTROSPECTION=OFF -DENABLE_DOCUMENTATION=OFF -DENABLE_API_TESTS=OFF \
@@ -141,5 +142,36 @@ build)
   echo "== installed into $DESTROOT$PREFIX =="
   ls -la "$DESTROOT$PREFIX/lib/" 2>/dev/null | head
   ;;
-*) die "usage: $(basename "$0") [configure|build]";;
+parity)
+  # Feature-parity check against a reference libWPEWebKit (the engine that shipped).
+  #
+  # Spot-checking a handful of features is not enough - ENABLE_DEVICE_ORIENTATION defaults OFF and was
+  # missing from this build for a while, which would have silently broken the motion/orientation sensors
+  # the app ships. Nothing in the NEEDED list catches that: the feature needs no extra library.
+  #
+  # Every enabled IDL interface contributes a generated JS<Name> binding class to the library, so
+  # diffing the full set of those names is a sensitive, cheap check for exactly this class of mistake.
+  REFLIB="${REFLIB:-$HOME/atlas-device-backup/ref/org.webosports.app.atlas/deviceroot/wpe-252/lib/libWPEWebKit-2.0.so.1}"
+  OURLIB="${OURLIB:-$DESTROOT$PREFIX/lib/libWPEWebKit-2.0.so.1}"
+  [ -f "$REFLIB" ] || die "no reference library at $REFLIB (set REFLIB=)"
+  [ -f "$OURLIB" ] || die "no built library at $OURLIB — run '$0 build' first"
+  tmp=$(mktemp -d); trap 'rm -rf "$tmp"' EXIT
+  strings -a "$OURLIB" | grep -xE 'JS[A-Z][A-Za-z0-9]+' \
+    | grep -vxE 'JS(Value|Object|String|Context|ContextGroup|GlobalContext|Class|PropertyName[A-Za-z]*|Type[A-Za-z]*|Garbage[A-Za-z]*|Check[A-Za-z]*|Evaluate[A-Za-z]*|Weak[A-Za-z]*|Export[A-Za-z]*|Retain|Release)[A-Za-z0-9]*' \
+    | sort -u > "$tmp/ours"
+  strings -a "$REFLIB" | grep -xE 'JS[A-Z][A-Za-z0-9]+' \
+    | grep -vxE 'JS(Value|Object|String|Context|ContextGroup|GlobalContext|Class|PropertyName[A-Za-z]*|Type[A-Za-z]*|Garbage[A-Za-z]*|Check[A-Za-z]*|Evaluate[A-Za-z]*|Weak[A-Za-z]*|Export[A-Za-z]*|Retain|Release)[A-Za-z0-9]*' \
+    | sort -u > "$tmp/ref"
+  echo "== binding classes: ours=$(wc -l < "$tmp/ours")  reference=$(wc -l < "$tmp/ref") =="
+  missing=$(comm -13 "$tmp/ours" "$tmp/ref")
+  extra=$(comm -23 "$tmp/ours" "$tmp/ref")
+  [ -n "$extra" ]   && { echo "-- enabled here but NOT in the reference:"; echo "$extra" | sed 's/^/     /'; }
+  if [ -n "$missing" ]; then
+    echo "-- MISSING relative to the reference (a feature is switched off):" >&2
+    echo "$missing" | sed 's/^/     /' >&2
+    die "feature parity check FAILED"
+  fi
+  echo "   no features missing relative to the reference"
+  ;;
+*) die "usage: $(basename "$0") [configure|build|parity]";;
 esac
