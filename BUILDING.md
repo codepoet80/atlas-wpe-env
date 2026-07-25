@@ -353,8 +353,67 @@ that is how the `stage-sysroot-atlas.sh` output was verified against the hand-as
 Add `-ffile-prefix-map=$STAGING=/staging` (and a `SOURCE_DATE_EPOCH`-derived date) if you ever need
 byte-reproducible output.
 
-### Not required for engine work
+## 8. Building WPE WebKit itself
 
-Rebuilding **WPE WebKit itself** (`build-webkit-252.sh`, ~40 min) is only needed when changing WebKit
-source or its `patches/`. For backend/BrowserServer changes you link against the WebKit libs pulled in
-step 3.
+Only needed when changing WebKit source or its `patches/` — for backend/BrowserServer work you link
+against the WebKit libs pulled in step 3. But this is what makes the build reproducible end-to-end
+instead of depending on a prebuilt engine runtime.
+
+```sh
+atlas-wpe-env/stage-hosttools-atlas.sh           # ruby + unifdef, unprivileged
+atlas-wpe-env/stage-sysroot-atlas.sh webkit-deps # 65 pinned armhf dev packages
+source atlas-wpe-env/env-atlas-cross.sh
+source atlas-wpe-env/hosttools-env.sh
+atlas-wpe-env/apply-webkit-patches.sh            # extract 2.52.4 + the Atlas series, in order
+atlas-wpe-env/build-webkit-atlas.sh configure
+atlas-wpe-env/build-webkit-atlas.sh build        # ~8500 targets
+```
+
+> **`build-webkit-252.sh` is not this.** That script disables VIDEO, GSTREAMER, WEBRTC and WEBGL — the
+> shipped engine plainly has all of them. It is an experiment, kept for reference. The feature set in
+> `build-webkit-atlas.sh` was reconstructed from the shipped `libWPEWebKit-2.0.so.1`: its 65 `NEEDED`
+> libraries and its symbol table (343 DFG references and zero CLoop → **JIT is on**, which is also why
+> `wpewebkit-2.52.4-softfp-jit.patch` exists).
+
+**Patch order matters.** `mediastream-camera` is authored on top of `mdpdetile-videosink`, and
+`webrtc-mono-opus` on top of `webrtc-receive-av`; applying them alphabetically fails.
+`apply-webkit-patches.sh` encodes the working order and is idempotent.
+
+**Dependencies are headers, not builds.** The engine links what the device already ships, so
+`webkit-deps` stages only dev headers and `.pc` files — 65 armhf packages pinned by version + sha256 in
+[`webkitdeps.list`](webkitdeps.list), fetched through an unprivileged apt root spanning
+bookworm/trixie/jammy. Versions track the **device's sonames**, not what is current:
+
+| Package | Pinned to | Because |
+|---------|-----------|---------|
+| `libicu-dev` | **70.1** (jammy) | ICU mangles every symbol with its major (`u_strToUpper_70`); any other ICU will not link against the device's `libicuuc.so.70` |
+| `libgstreamer1.0-dev` + plugins | **1.20.1** (jammy) | device ships GStreamer 1.20.7 |
+| `libjpeg62-turbo-dev` | Debian | device ships `libjpeg.so.62`; Ubuntu's is `libjpeg.so.8` |
+| `libcairo2-dev` | 1.18 (trixie) | device ships cairo 1.18.0 |
+
+About half the list is *transitive pkg-config providers* (libpcre2, brotli, expat, libdw, libunwind,
+orc, nghttp2, ffi, the X11 headers cairo's `.pc` references). They matter more than they look:
+
+> **`pkg-config --modversion` succeeding proves nothing.** Only `--cflags --libs` walks the transitive
+> `Requires:`. A missing `libpcre2-8.pc` surfaces as `Could NOT find Soup3: Found unsuitable version ".."`,
+> because WebKit's Find modules silently fall back to scraping version headers when pkg-config fails.
+> Also, `apt-get download` aborts the **entire batch** on one bad package name — fetch one at a time, or
+> you will believe you staged things you did not.
+
+**Four cross-build traps**, each worth a failed configure:
+
+1. **`unset CFLAGS CXXFLAGS LDFLAGS` before cmake.** `env-atlas-cross.sh` aims them at the BrowserServer
+   build, and `-L$STAGING/lib` puts the *device's* `libc.so` on the link line, shadowing the toolchain's
+   and leaving `__libc_csu_init` undefined — CMake's trivial-program check fails outright.
+2. **No `CMAKE_SYSROOT`.** `--sysroot` replaces the toolchain's own sysroot, so libc's headers stop
+   resolving. Dependency headers arrive as explicit `-I` from pkg-config instead.
+3. **`$STAGING/rootfs` must not be on the link path** — unlike the BrowserServer build. rootfs is the
+   device's *system* tree (glibc 2.8). Because `linklib` deliberately excludes libc/libpthread, ld falls
+   through to rootfs and picks up the 2.8 `libpthread.so.0`, whose `GLIBC_PRIVATE` symbols
+   (`__default_sa_restorer_v2`, `h_errno`, …) do not exist in glibc 2.23.
+4. **Add `/usr/include/<triplet>` explicitly.** Debian multiarch keeps `gpg-error.h`, `ffi.h`,
+   `jconfig.h`, `openssl/` and `libxslt/` there, and pkg-config never emits that directory.
+
+`CMAKE_INSTALL_PREFIX` is the **device** path (`/var/atlas252`, the short symlink `postinst` creates),
+with `DESTDIR` staging the tree locally. That bakes correct `PKGLIBEXECDIR`/`PKGLIBDIR` at build time,
+so the binary prefix-patching `deploy-252.sh` performs is no longer needed.
