@@ -1,6 +1,6 @@
 --- a/Source/WebCore/rendering/RenderView.cpp
 +++ b/Source/WebCore/rendering/RenderView.cpp
-@@ -79,6 +79,28 @@
+@@ -79,6 +79,40 @@
  
  namespace WebCore {
  
@@ -26,10 +26,22 @@
 +    return cap;
 +}
 +
++// Viewport units (vh/svh/lvh/dvh) do NOT go through viewHeight(); they resolve via
++// LocalFrameView::sizeForCSS*ViewportUnits(). Capping only the ICB would fix `height: 100%` while
++// leaving `height: 100vh` resolving against the whole pan buffer - the same "content starts a screen
++// and a half down" bug, just on a different set of pages. Cap both, consistently.
++static inline FloatSize atlasCapViewportSize(FloatSize size)
++{
++    int cap = atlasICBHeightCap();
++    if (cap > 0 && size.height() > cap)
++        size.setHeight(cap);
++    return size;
++}
++
  WTF_MAKE_TZONE_ALLOCATED_IMPL(RenderView);
  
  RenderView::RenderView(Document& document, RenderStyle&& style)
-@@ -163,7 +185,14 @@
+@@ -163,7 +197,14 @@
      if (document().isPluginDocument() && frameView->useFixedLayout())
          return frameView->fixedLayoutSize().height();
  #endif
@@ -45,7 +57,7 @@
  }
  
  bool RenderView::isChildAllowed(const RenderObject& child, const RenderStyle&) const
-@@ -791,6 +820,9 @@
+@@ -791,6 +832,9 @@
          Ref frameView = this->frameView();
          height = frameView->layoutHeight();
          height = frameView->useFixedLayout() ? ceilf(style().usedZoom() * float(height)) : height;
@@ -55,3 +67,30 @@
      }
      return height;
  }
+@@ -827,22 +871,22 @@
+ 
+ FloatSize RenderView::sizeForCSSSmallViewportUnits() const
+ {
+-    return frameView().sizeForCSSSmallViewportUnits();
++    return atlasCapViewportSize(frameView().sizeForCSSSmallViewportUnits());
+ }
+ 
+ FloatSize RenderView::sizeForCSSLargeViewportUnits() const
+ {
+-    return frameView().sizeForCSSLargeViewportUnits();
++    return atlasCapViewportSize(frameView().sizeForCSSLargeViewportUnits());
+ }
+ 
+ FloatSize RenderView::sizeForCSSDynamicViewportUnits() const
+ {
+-    return frameView().sizeForCSSDynamicViewportUnits();
++    return atlasCapViewportSize(frameView().sizeForCSSDynamicViewportUnits());
+ }
+ 
+ FloatSize RenderView::sizeForCSSDefaultViewportUnits() const
+ {
+-    return frameView().sizeForCSSDefaultViewportUnits();
++    return atlasCapViewportSize(frameView().sizeForCSSDefaultViewportUnits());
+ }
+ 
+ Node* RenderView::nodeForHitTest() const
