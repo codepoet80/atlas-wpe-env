@@ -111,15 +111,12 @@ echo "== 4. link BrowserServer-atlas (bundled ld-linux + rpath; toolchain provid
   -Wl,-rpath-link,"$LL" -Wl,-rpath-link,"$RL/usr/lib" -Wl,-rpath-link,"$RL/lib" -Wl,-rpath-link,"$RL/usr/lib/ssl11" \
   -Wl,--unresolved-symbols=ignore-in-object-files
 echo "== 5. null-call guard =="
-# Every `blx 0` is an unresolved symbol that will SIGSEGV when reached. Only the unfinished QtWebKit
-# hit-test/cache paths are allowed to have them; anything else is a missing source file or library and
-# MUST fail the build. This exact class of bug shipped once: Settings.cpp calls
+# Every `blx 0` is an unresolved symbol that will SIGSEGV when reached, so NONE are tolerated. This exact class of bug shipped once: Settings.cpp calls
 # webOS::WebSettings::initSettings(), WebKitSupplemental/misc was never compiled in, and BrowserServer
 # SIGSEGV'd inside InitSettings() on startup with an empty log.
-ALLOWED_NULLCALL='_ZN13BrowserServer27asyncCmdGetImageInfoAtPointEP8YapProxyiii
-_ZN13BrowserServer25asyncCmdInspectUrlAtPointEP8YapProxyiii
-_ZN13BrowserServer10clearCacheEv
-_ZN11BrowserPage7hitTestEjj'
+# Was four QtWebKit hit-test/cache stubs; all now have real WPE implementations or fail safe, so the
+# allowlist is EMPTY and any null call at all fails the build.
+ALLOWED_NULLCALL=''
 BAD=$("${OBJDUMP:-$TARGET-objdump}" -d "$OBJ/BrowserServer-atlas" 2>/dev/null | awk '
   /^[0-9a-f]+ </ { fn=$2; gsub(/[<>:]/,"",fn) }
   /blx?\t0 </    { print fn }' | sort -u | grep -vxF "$ALLOWED_NULLCALL" || true)
@@ -129,6 +126,6 @@ if [ -n "$BAD" ]; then
   echo "   !! These WILL SIGSEGV at runtime. A source file or -l library is missing from this script." >&2
   exit 1
 fi
-echo "   OK — null calls confined to the known QtWebKit hit-test stubs"
+echo "   OK — no calls to address 0"
 
 echo "== built: $OBJ/BrowserServer-atlas  ($(du -h "$OBJ/BrowserServer-atlas"|cut -f1)) =="
