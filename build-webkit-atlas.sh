@@ -38,7 +38,8 @@ STAGING="${STAGING:-$HOME/atlas-staging}"
 # WebCore's unified sources are memory-hungry: a single cc1plus routinely passes 2 GB and the worst
 # ones go higher, so -j$(nproc) on a 12-core/31 GB box can be OOM-killed. When that happens ninja
 # reports only "fatal error: Killed signal terminated program cc1plus", which is easy to mistake for a
-# compiler bug. Budget ~3 GB per job and cap at the core count.
+# compiler bug. Budget ~4 GB per job and cap at the core count; 3 GB/job resolved to -j10 on a 31 GB
+# host, which consumed all headroom at peak.
 if [ -z "${JOBS:-}" ]; then
   _mem_gb=$(awk '/MemTotal/ {printf "%d", $2/1024/1024}' /proc/meminfo 2>/dev/null || echo 8)
   _by_mem=$(( _mem_gb / 4 )); [ "$_by_mem" -lt 1 ] && _by_mem=1
