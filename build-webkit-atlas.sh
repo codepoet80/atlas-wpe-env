@@ -35,7 +35,16 @@ V=2.52.4
 TREE="$WK_SRC/wpewebkit-$V"
 BUILD="$TREE/_b"
 STAGING="${STAGING:-$HOME/atlas-staging}"
-JOBS="${JOBS:-$(nproc)}"
+# WebCore's unified sources are memory-hungry: a single cc1plus routinely passes 2 GB and the worst
+# ones go higher, so -j$(nproc) on a 12-core/31 GB box can be OOM-killed. When that happens ninja
+# reports only "fatal error: Killed signal terminated program cc1plus", which is easy to mistake for a
+# compiler bug. Budget ~3 GB per job and cap at the core count.
+if [ -z "${JOBS:-}" ]; then
+  _mem_gb=$(awk '/MemTotal/ {printf "%d", $2/1024/1024}' /proc/meminfo 2>/dev/null || echo 8)
+  _by_mem=$(( _mem_gb / 3 )); [ "$_by_mem" -lt 1 ] && _by_mem=1
+  _cores=$(nproc)
+  JOBS=$(( _by_mem < _cores ? _by_mem : _cores ))
+fi
 LOGDIR="${LOGDIR:-$WK_SRC/logs}"; mkdir -p "$LOGDIR"
 
 # Install prefix is the DEVICE path, so WebKit bakes correct PKGLIBEXECDIR/PKGLIBDIR at build time and
