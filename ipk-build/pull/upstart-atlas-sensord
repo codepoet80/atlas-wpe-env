@@ -9,4 +9,7 @@ description "atlas-sensord (HAL sensors -> Atlas browser)"
 exec /media/cryptofs/apps/usr/palm/applications/org.webosports.app.atlas/deviceroot/atlas/atlas-sensord
 
 respawn
-respawn limit 0 0
+# Cap respawns: if the daemon can't start (e.g. the binary is missing/stale) upstart retries at most 5
+# times in 60s then gives up, instead of `respawn limit 0 0` (unlimited, zero-delay) which turns a
+# missing binary into an endless crash-loop flooding /var/log/messages with thousands of lines.
+respawn limit 5 60
