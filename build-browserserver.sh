@@ -5,7 +5,7 @@
 # legacy interface TYPES (QWebHitTestResult etc.) — see §8 of BROWSERSERVER-INTEGRATION-PLAN.md for the
 # de-QtWebKit cleanup. Iterative, like the dep stack.
 set -u
-WPE=/home/herrie/webos/wpe; DS=/home/herrie/webos/touchpad-kernel/doctor305; BS=$DS/BrowserServer
+WPE="${WPE:-$HOME/webos/wpe}"; DS="${DS:-$HOME/webos/touchpad-kernel/doctor305}"; BS=$DS/BrowserServer
 SRC=$WPE/browserserver-wpe/src; OBJ=$WPE/browserserver-wpe/obj; L=$WPE/logs
 . "${WPE_ENV:-$WPE/env-glibc.sh}"
 mkdir -p "$OBJ"
@@ -25,7 +25,7 @@ def block(t,n):
         k+=1
 BANNER=('/* !!! GENERATED FILE - DO NOT EDIT !!!\n'
         ' * Auto-merged by atlas-wpe-env/build-browserserver.sh from the CANONICAL source:\n'
-        ' *   ~/Documents/GitHub/atlas-wpe-backend/BrowserPageWPE.{cpp,h}  (class BrowserPageWPE)\n'
+        ' *   atlas-wpe-backend/BrowserPageWPE.{cpp,h}  (class BrowserPageWPE)\n'
         ' * This copy renames the class to BrowserPage and is OVERWRITTEN on every build.\n'
         ' * Edit the canonical BrowserPageWPE.* instead; changes here are lost. */\n\n')
 orig=open(f'{BS}/Src/BrowserPage.h').read(); wpe=open(f'{WPE}/backend-atlas/BrowserPageWPE.h').read()

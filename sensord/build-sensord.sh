@@ -5,9 +5,9 @@
 # is to run OUTSIDE the Atlas private-glibc sandbox.
 set -eu
 HERE=$(cd "$(dirname "$0")" && pwd)
-PDK=/opt/PalmPDK
+PDK="${PDK:-/opt/PalmPDK}"
 CC=$PDK/arm-gcc/bin/arm-none-linux-gnueabi-gcc
-HALINC=/home/herrie/webos/touchpad-kernel/doctor305/build-deps/staging/include
+HALINC="${HALINC:-$HOME/webos/touchpad-kernel/doctor305/build-deps/staging/include}"
 
 # libhal.so to link against (device copy pulled to the tree; runtime uses /usr/lib/libhal.so on-device)
 [ -f "$HERE/libhal.so" ] || cp /tmp/libhal.so "$HERE/libhal.so" 2>/dev/null || { echo "need libhal.so (novacom get file:///usr/lib/libhal.so > $HERE/libhal.so)"; exit 1; }

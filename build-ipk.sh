@@ -10,9 +10,9 @@
 #   ./build-ipk.sh                 (strip engine — ~90MB ipk)
 #   DOSTRIP=0 ./build-ipk.sh       (unstripped engine, ~2x, for gdb)
 set -eu
-WPE=/home/herrie/webos/wpe
-ENV=/home/herrie/Documents/GitHub/atlas-wpe-env
-APPSRC=/home/herrie/Documents/GitHub/atlas-browser-app
+WPE="${WPE:-$HOME/webos/wpe}"
+ENV="${ENV:-$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)}"   # this repo (atlas-wpe-env), derived
+APPSRC="${APPSRC:-$(dirname "$ENV")/atlas-browser-app}"             # sibling checkout by default; override with APPSRC=
 APPNAME=org.webosports.app.atlas
 OUT=$WPE/atlas-restore
 APP=$OUT/$APPNAME

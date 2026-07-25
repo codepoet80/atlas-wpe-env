@@ -5,7 +5,7 @@
 #   codec libs   -> $DEV/lib               (libvpx.so.*, libopus.so.*)
 #   gst plugins  -> $DEV/lib/gstreamer-1.0 (libgstrtp.so, libgstvpx.so, libgstopus.so)
 set -u
-WPE=/home/herrie/webos/wpe; S=$WPE/staging-glibc-252
+WPE="${WPE:-$HOME/webos/wpe}"; S=$WPE/staging-glibc-252
 DEV=/media/cryptofs/apps/usr/palm/applications/org.webosports.app.atlas/deviceroot/wpe-252
 GST=$DEV/lib/gstreamer-1.0
 

@@ -5,10 +5,10 @@
 #                               the socket. NO libpulse dep (that would SIGSEGV the atlas WebProcess). See qspkd.c.
 set -e
 HERE="$(cd "$(dirname "$0")" && pwd)"
-WPE=/home/herrie/webos/wpe
+WPE="${WPE:-$HOME/webos/wpe}"
 
 echo "=== 1. qspkd  (SYSTEM glibc: PalmPDK arm-2009q1 + system libpulse) ==="
-PDK=/home/herrie/webos/touchpad-kernel/doctor305/isis-project/toolchain/arm-2009q1/bin/arm-none-linux-gnueabi
+PDK="${PDK:-$HOME/webos/touchpad-kernel/doctor305/isis-project/toolchain/arm-2009q1/bin/arm-none-linux-gnueabi}"
 PULSE_INC="$WPE/build/pulseaudio-0.9.22/src"     # pa_simple.h — types/enums only (functions are dlopen'd)
 # qspkd DLOPENs libpulse-simple at runtime, so it links only libc + libdl here (no libpulse chain, no --sysroot).
 "$PDK-gcc" -O2 -Wall -o "$HERE/qspkd" "$HERE/qspkd.c" -I"$PULSE_INC" -ldl

@@ -17,7 +17,7 @@
 # WebCodecs gives Video/AudioDecoder but NOT ImageDecoder (unimplemented in 2.52) — so the html5test image
 # format rows (WebP/JPEG/PNG/GIF) are NOT winnable here despite WebP <img> decode working fine.
 set -u
-WPE=/home/herrie/webos/wpe
+WPE="${WPE:-$HOME/webos/wpe}"
 . "${WPE_ENV:-$WPE/env-glibc-gcc125.sh}"
 cd "$WPE/build/wpewebkit-2.52.4/_b" || { echo "no _b build dir"; exit 2; }
 export RUBYOPT="-r$WPE/ruby-compat.rb"

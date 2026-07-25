@@ -19,7 +19,7 @@
 #   X
 # Default guess below is $DEV/lib/gstreamer-1.0 . Override: GST_PLUGIN_DIR=... ./redeploy-webrtc.sh
 set -u
-WPE=/home/herrie/webos/wpe; S=$WPE/staging-glibc-252
+WPE="${WPE:-$HOME/webos/wpe}"; S=$WPE/staging-glibc-252
 DEV=/media/cryptofs/apps/usr/palm/applications/org.webosports.app.atlas/deviceroot/wpe-252
 GST_PLUGIN_DIR="${GST_PLUGIN_DIR:-$DEV/lib/gstreamer-1.0}"
 B="$WPE/build/wpewebkit-2.52.4/_b"
@@ -57,9 +57,9 @@ done
 
 echo "=== 4. libWPEWebKit (prefix-patch host staging -> /var/atlas252, then put) ==="
 TMP=$(mktemp /tmp/libwpe.XXXX.so); cp -f "$B/lib/libWPEWebKit-2.0.so.1.9.8" "$TMP"
-python3 - "$TMP" <<'PY'
+ATLAS_HOST_PREFIX="${STAGING:-$WPE/staging-glibc-252}" python3 - "$TMP" <<'PY'
 import sys
-host=b'/home/herrie/webos/wpe/staging-glibc-252'; dev=b'/var/atlas252'
+import os; host=os.environ['ATLAS_HOST_PREFIX'].encode(); dev=b'/var/atlas252'
 pad=b''
 while len(dev+pad)<len(host): pad+=b'/.'
 pad=pad[:len(host)-len(dev)]; devp=dev+pad; assert len(devp)==len(host)

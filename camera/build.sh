@@ -11,7 +11,7 @@ HERE=$(cd "$(dirname "$0")" && pwd)
 cd "$HERE"
 
 # --- 1) qcamd + native validators: PalmPDK arm-none-linux-gnueabi-gcc-4.3.3 (device glibc-2.8) ---
-PDK=/opt/PalmPDK/arm-gcc
+PDK="${PDK:-/opt/PalmPDK/arm-gcc}"
 PCC=$PDK/bin/arm-none-linux-gnueabi-gcc-4.3.3
 PSYS=$PDK/sysroot
 echo "== qcamd (PalmPDK) =="
@@ -21,7 +21,7 @@ $PCC --sysroot=$PSYS -O2 -Wall -o qcam_probe       qcam_probe.c       -ldl
 echo "  ok: $(ls -la qcamd | awk '{print $5}') bytes"
 
 # --- 2) libgstqcamsrc.so + gst test: ATLAS gcc125 against staging gst 1.20 ---
-WPE=/home/herrie/webos/wpe
+WPE="${WPE:-$HOME/webos/wpe}"
 . $WPE/env-glibc-gcc125.sh 2>/dev/null
 GST_CFLAGS=$(pkg-config --cflags gstreamer-1.0 gstreamer-base-1.0 gstreamer-video-1.0)
 GST_LIBS=$(pkg-config --libs   gstreamer-1.0 gstreamer-base-1.0 gstreamer-video-1.0)
