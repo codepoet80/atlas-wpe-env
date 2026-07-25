@@ -72,6 +72,29 @@ cp -f "$BACKEND"                     "$D/lib/libWPEBackend-atlas.so"
 echo "   BrowserServer-atlas  $(stat -c%s "$D/BrowserServer-atlas") bytes"
 echo "   libWPEBackend-atlas.so $(stat -c%s "$D/lib/libWPEBackend-atlas.so") bytes"
 
+# WPE WebKit itself, if it has been built from source (build-webkit-atlas.sh). Without this the engine
+# runtime is whatever $DEVICEROOT_REF carried, i.e. prebuilt. Set WEBKIT_DESTROOT= to skip.
+WEBKIT_DESTROOT="${WEBKIT_DESTROOT-$REPOS/webkit-build/destroot/var/atlas252}"
+if [ -n "$WEBKIT_DESTROOT" ] && [ -d "$WEBKIT_DESTROOT/lib" ]; then
+  echo "=== 3b. overlay WPE WebKit built from source ($WEBKIT_DESTROOT) ==="
+  # Copy the real files, not the .so -> .so.1 -> .so.1.9.8 symlink chain: cryptofs has no symlinks, so
+  # the deviceroot keeps one real file per SONAME (same rule full-restore-atlas.sh follows).
+  wk_real=$(readlink -f "$WEBKIT_DESTROOT/lib/libWPEWebKit-2.0.so.1")
+  [ -f "$wk_real" ] || die "no libWPEWebKit in $WEBKIT_DESTROOT/lib"
+  cp -f "$wk_real" "$D/lib/libWPEWebKit-2.0.so.1"
+  cp -f "$WEBKIT_DESTROOT/libexec/wpe-webkit-2.0/WPEWebProcess"     "$D/libexec/wpe-webkit-2.0/"
+  cp -f "$WEBKIT_DESTROOT/libexec/wpe-webkit-2.0/WPENetworkProcess" "$D/libexec/wpe-webkit-2.0/"
+  cp -f "$WEBKIT_DESTROOT/lib/wpe-webkit-2.0/injected-bundle/libWPEInjectedBundle.so" \
+        "$D/lib/wpe-webkit-2.0/injected-bundle/"
+  # Web Inspector resources ship beside the library; keep them in step with it.
+  [ -d "$WEBKIT_DESTROOT/lib/wpe-webkit-2.0" ] && cp -rf "$WEBKIT_DESTROOT/lib/wpe-webkit-2.0/." "$D/lib/wpe-webkit-2.0/"
+  echo "   libWPEWebKit-2.0.so.1 $(stat -c%s "$D/lib/libWPEWebKit-2.0.so.1") bytes (from source)"
+  ATLAS_WEBKIT_FROM_SOURCE=1
+else
+  echo "=== 3b. WPE WebKit: using the PREBUILT runtime from \$DEVICEROOT_REF ==="
+  ATLAS_WEBKIT_FROM_SOURCE=0
+fi
+
 echo "=== 4. overlay artifacts committed in this repo ==="
 cp -f "$ENV_DIR/ipk-build/pull/wrapper-BrowserServer" "$A/BrowserServer"   # upstart execs ./BrowserServer
 mkdir -p "$APP/deviceroot/BrowserPlugins" "$APP/deviceroot/event.d" "$APP/deviceroot/ls2-roles"
@@ -150,4 +173,9 @@ rm -f "$IPK"
 rm -f "$OUT/debian-binary" "$OUT/control.tar.gz" "$OUT/data.tar.gz"
 
 echo "== built: $IPK  ($(du -h "$IPK" | cut -f1), installed ~$((INSTALLED_KB/1024)) MB, v$VER) =="
+if [ "${ATLAS_WEBKIT_FROM_SOURCE:-0}" = 1 ]; then
+  echo "   engine: WPE WebKit built FROM SOURCE"
+else
+  echo "   engine: WPE WebKit is the PREBUILT runtime from \$DEVICEROOT_REF (build it with build-webkit-atlas.sh)"
+fi
 echo "   install via Preware / WebOS Quick Install (postinst must run as root)."
