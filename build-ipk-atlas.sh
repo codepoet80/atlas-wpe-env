@@ -88,7 +88,21 @@ if [ -n "$WEBKIT_DESTROOT" ] && [ -d "$WEBKIT_DESTROOT/lib" ]; then
         "$D/lib/wpe-webkit-2.0/injected-bundle/"
   # Web Inspector resources ship beside the library; keep them in step with it.
   [ -d "$WEBKIT_DESTROOT/lib/wpe-webkit-2.0" ] && cp -rf "$WEBKIT_DESTROOT/lib/wpe-webkit-2.0/." "$D/lib/wpe-webkit-2.0/"
+
+  # Freshly built launchers point at the HOST-default interpreter (/lib/ld-linux.so.3 — on the device
+  # that is the ancient system glibc 2.8) and carry no RPATH, because CMake drops the build RPATH at
+  # install time unless CMAKE_INSTALL_RPATH is set. Left alone they die with
+  #   "libWPEWebKit-2.0.so.1: cannot open shared object file"
+  # while BrowserServer itself stays up, so the browser looks alive but renders nothing. Point them at
+  # the bundled loader and engine lib dir, matching what the shipped binaries carry.
+  command -v patchelf >/dev/null || die "patchelf required to fix the WebKit launchers"
+  for b in "$D/libexec/wpe-webkit-2.0/WPEWebProcess" "$D/libexec/wpe-webkit-2.0/WPENetworkProcess"; do
+    patchelf --set-interpreter "$CRYPTO_DR/wpe-252/lib/ld-linux.so.3" \
+             --force-rpath --set-rpath "$CRYPTO_DR/wpe-252/lib:/usr/lib:/lib" "$b" \
+      || die "patchelf failed on $(basename "$b")"
+  done
   echo "   libWPEWebKit-2.0.so.1 $(stat -c%s "$D/lib/libWPEWebKit-2.0.so.1") bytes (from source)"
+  echo "   patchelf'd WPEWebProcess/WPENetworkProcess to the bundled loader + engine rpath"
   ATLAS_WEBKIT_FROM_SOURCE=1
 else
   echo "=== 3b. WPE WebKit: using the PREBUILT runtime from \$DEVICEROOT_REF ==="
@@ -132,6 +146,15 @@ done
 # Our BrowserServer must already carry the bundled loader + device rpath (the build script links it so).
 readelf -p .interp "$D/BrowserServer-atlas" 2>/dev/null | grep -q "wpe-252/lib/ld-linux.so.3" \
   || die "BrowserServer-atlas is not linked against the bundled loader"
+# Same for the WebKit launchers. If these point at /lib/ld-linux.so.3 (the device's glibc 2.8) or have
+# no RPATH, BrowserServer still starts and the browser renders NOTHING - the only symptom is
+# "cannot open shared object file" buried in the engine log.
+for b in "$D/libexec/wpe-webkit-2.0/WPEWebProcess" "$D/libexec/wpe-webkit-2.0/WPENetworkProcess"; do
+  readelf -p .interp "$b" 2>/dev/null | grep -q "wpe-252/lib/ld-linux.so.3" \
+    || die "$(basename "$b") does not use the bundled loader"
+  readelf -d "$b" 2>/dev/null | grep -qE "RPATH|RUNPATH" \
+    || die "$(basename "$b") has no RPATH — it will not find libWPEWebKit at runtime"
+done
 echo "   guards passed"
 
 if [ "$DOSTRIP" = 1 ]; then
