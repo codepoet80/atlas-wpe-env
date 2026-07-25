@@ -37,6 +37,7 @@ $SCRIPT_DIR/wpe-$V-atlas-sysprof-oldkernel-fcntl.patch
 $SCRIPT_DIR/wpe-$V-atlas-glibc223-roundeven.patch
 $SCRIPT_DIR/wpe-$V-atlas-webrtc-ssrc-accessor.patch
 $SCRIPT_DIR/wpe-$V-atlas-paymentrequest-gcc12.patch
+$SCRIPT_DIR/wpe-$V-atlas-icb-height-cap.patch
 "
 
 die(){ echo "apply-webkit-patches: $*" >&2; exit 1; }

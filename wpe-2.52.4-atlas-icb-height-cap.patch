@@ -1,0 +1,57 @@
+--- a/Source/WebCore/rendering/RenderView.cpp
++++ b/Source/WebCore/rendering/RenderView.cpp
+@@ -79,6 +79,28 @@
+ 
+ namespace WebCore {
+ 
++// Atlas/TouchPad: the engine deliberately renders into a pan buffer several screens tall and the
++// browser adapter pans within it, because this Adreno cannot read back per scroll frame (see
++// BrowserPageWPE::ensureWebView). So the WPE view height is a PAINT extent, not the user-visible
++// viewport. Left alone the initial containing block becomes the whole buffer, and quirks-mode
++// `height: 100%` layouts resolve against ~4 screens - the page loads with its "centred" content
++// roughly a screen and a half below the fold.
++//
++// ATLAS_ICB_HEIGHT (exported by BrowserPageWPE before the WebProcess starts) is the real screen
++// height. Capping the ICB to it makes percentage heights resolve against one screen, while the view
++// size, the visible content rect, scrolling and the painted region are all left exactly as they were
++// - so the tall buffer and its smooth scrolling still work.
++static int atlasICBHeightCap()
++{
++    static const int cap = [] {
++        const char* env = getenv("ATLAS_ICB_HEIGHT");
++        int value = env ? atoi(env) : 0;
++        // Ignore nonsense; 4096 is the Adreno GL_MAX_TEXTURE_SIZE the buffer is capped to anyway.
++        return (value >= 200 && value <= 4096) ? value : 0;
++    }();
++    return cap;
++}
++
+ WTF_MAKE_TZONE_ALLOCATED_IMPL(RenderView);
+ 
+ RenderView::RenderView(Document& document, RenderStyle&& style)
+@@ -163,7 +185,14 @@
+     if (document().isPluginDocument() && frameView->useFixedLayout())
+         return frameView->fixedLayoutSize().height();
+ #endif
+-    return isHorizontalWritingMode() ? frameView->layoutSize().height() : frameView->layoutSize().width();
++    if (!isHorizontalWritingMode())
++        return frameView->layoutSize().width();
++    // Same Atlas pan-buffer cap as viewHeight(); this path reads layoutSize() directly, so it needs it
++    // too or percentage heights would still resolve against the buffer.
++    int height = frameView->layoutSize().height();
++    if (int cap = atlasICBHeightCap(); cap > 0 && height > cap)
++        height = cap;
++    return height;
+ }
+ 
+ bool RenderView::isChildAllowed(const RenderObject& child, const RenderStyle&) const
+@@ -791,6 +820,9 @@
+         Ref frameView = this->frameView();
+         height = frameView->layoutHeight();
+         height = frameView->useFixedLayout() ? ceilf(style().usedZoom() * float(height)) : height;
++        if (int cap = atlasICBHeightCap(); cap > 0 && height > cap)
++            height = cap;   // Atlas pan-buffer: keep the ICB one screen tall
++
+     }
+     return height;
+ }
