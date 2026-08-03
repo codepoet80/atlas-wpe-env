@@ -263,6 +263,32 @@ binary. A/B on `example.com`: 113 vs 115 frames, 12 vs 13 `WPEWebProcess` spawns
 
 `deploy-252.sh` / `redeploy-webkit.sh` cover the fuller flows (WebKit runtime, test harness).
 
+### The deadlock watchdog and `-d` (do not raise it back)
+
+The boot wrapper runs the engine with `-d 90000`. That number is load-bearing for the **GPU wedge**
+([#3](https://github.com/Herrie82/atlas-wpe-env/issues/3)): a wedge parks BrowserServer's main thread in
+`futex_wait_queue_me` with yap still accepting but nothing being serviced, and the yap deadlock watchdog
+(`YapServer.cpp`) is the **only** thing that recovers it — it `abort()`s, upstart respawns, and the app's
+cards reload themselves.
+
+It used to be `-d 600000`, raised from the 15 s default because a memory-pressure GC stall would trip the
+watchdog and abort a perfectly healthy engine. The cost was that a wedge took **14 min 30 s** to clear,
+which every user reads as permanent. `YapServer.cpp` now gates the abort on the process **also being
+idle**, which distinguishes the two cases the tick counter alone cannot:
+
+| | main loop ticking | process CPU |
+|---|---|---|
+| GC / swap-in stall | stalled | pegs a core → abort deferred (bounded by `kMaxBusyStalls`) |
+| GPU wedge | stalled | ~idle → abort immediately |
+
+Measured on-device 2026-08-03 against a real wedge: `Deadlock detected; aborting! (528 cpu ticks in the
+last 90000ms)` — 528 against a 2250-tick (25% of one core) threshold — wedge to serving pages again in
+**63 s**.
+
+Two practical notes: that message goes to **syslog** (`/var/log/messages`), *not* `bs-atlas.log`, so grep
+the right file when checking whether the watchdog fired. And do not lower `-d` below ~90 s on an engine
+built **before** this gate, or GC stalls will start killing healthy engines again.
+
 ## 7. Package the installable ipk ✅
 
 `build-ipk-atlas.sh` produces the real, installable `org.webosports.app.atlas_<ver>_all.ipk` (~99 MB
