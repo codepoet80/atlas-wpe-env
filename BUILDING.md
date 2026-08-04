@@ -93,7 +93,8 @@ The sysroot (`$STAGING`, default `~/atlas-staging`) holds the engine's **librari
 matching **dev headers** (to compile against). It is built by one script:
 
 ```sh
-atlas-wpe-env/stage-sysroot-atlas.sh all      # = headers + device + linklib
+atlas-wpe-env/stage-sysroot-atlas.sh all         # = headers + device + linklib
+atlas-wpe-env/stage-sysroot-atlas.sh everything  # ... plus webkit-deps (needed only for §8)
 ```
 
 or one phase at a time:
@@ -103,6 +104,7 @@ or one phase at a time:
 | `headers` | `include/` — pinned Debian armhf dev debs (extracted, never installed) + host Khronos/zlib + libwpe + this repo's `reconstructed-headers/` | network |
 | `device`  | `lib/` (engine runtime, `deviceroot/wpe-252/lib`) and `rootfs/` (`/usr/lib` + `/lib`, ~84 MB, for `-rpath-link`) | a TouchPad running Atlas, over novacom |
 | `linklib` | derives `linklib/` + the unversioned dev symlinks from `lib/` | — |
+| `webkit-deps` | `webkitdeps/` — 65 pinned armhf dev packages (headers + `.pc`) for building WebKit itself, §8 | network |
 
 Overridable: `STAGING`, `REPOS`, `DEB_CACHE`, `CRYPTO_DR`, `LIBWPE_TAG`.
 
@@ -261,6 +263,32 @@ binary. A/B on `example.com`: 113 vs 115 frames, 12 vs 13 `WPEWebProcess` spawns
 
 `deploy-252.sh` / `redeploy-webkit.sh` cover the fuller flows (WebKit runtime, test harness).
 
+### The deadlock watchdog and `-d` (do not raise it back)
+
+The boot wrapper runs the engine with `-d 90000`. That number is load-bearing for the **GPU wedge**
+([#3](https://github.com/Herrie82/atlas-wpe-env/issues/3)): a wedge parks BrowserServer's main thread in
+`futex_wait_queue_me` with yap still accepting but nothing being serviced, and the yap deadlock watchdog
+(`YapServer.cpp`) is the **only** thing that recovers it — it `abort()`s, upstart respawns, and the app's
+cards reload themselves.
+
+It used to be `-d 600000`, raised from the 15 s default because a memory-pressure GC stall would trip the
+watchdog and abort a perfectly healthy engine. The cost was that a wedge took **14 min 30 s** to clear,
+which every user reads as permanent. `YapServer.cpp` now gates the abort on the process **also being
+idle**, which distinguishes the two cases the tick counter alone cannot:
+
+| | main loop ticking | process CPU |
+|---|---|---|
+| GC / swap-in stall | stalled | pegs a core → abort deferred (bounded by `kMaxBusyStalls`) |
+| GPU wedge | stalled | ~idle → abort immediately |
+
+Measured on-device 2026-08-03 against a real wedge: `Deadlock detected; aborting! (528 cpu ticks in the
+last 90000ms)` — 528 against a 2250-tick (25% of one core) threshold — wedge to serving pages again in
+**63 s**.
+
+Two practical notes: that message goes to **syslog** (`/var/log/messages`), *not* `bs-atlas.log`, so grep
+the right file when checking whether the watchdog fired. And do not lower `-d` below ~90 s on an engine
+built **before** this gate, or GC stalls will start killing healthy engines again.
+
 ## 7. Package the installable ipk ✅
 
 `build-ipk-atlas.sh` produces the real, installable `org.webosports.app.atlas_<ver>_all.ipk` (~99 MB
@@ -281,11 +309,12 @@ DOSTRIP=0 atlas-wpe-env/build-ipk-atlas.sh    # keep symbols, for gdb
 | `BrowserServer-atlas`, `libWPEBackend-atlas.so` | **built from source here** (§5) |
 | boot wrapper, NPAPI adapter, upstart jobs, ls2 roles, `atlas-sensord`, `qspkd`, postinst/prerm | committed in this repo |
 | Enyo front-end (`appinfo`/`index.html`/`source`/`css`/`images`/`db`) | `atlas-browser-app` checkout |
-| WPE WebKit runtime (`libWPEWebKit`, `WPEWebProcess`/`WPENetworkProcess`, injected bundle), GStreamer stack, glibc-2.23 runtime, `share/`, `webkit-data`, `fonts.conf`/`gstomx.conf`, `qcamd`/`qmicd` | **`$DEVICEROOT_REF`** — a deviceroot pulled off a working device |
+| WPE WebKit (`libWPEWebKit`, `WPEWebProcess`/`WPENetworkProcess`, injected bundle) | **built from source** (§8), when a `build-webkit-atlas.sh` destroot is present |
+| GStreamer stack, glibc-2.23 runtime, `share/`, `webkit-data`, `fonts.conf`/`gstomx.conf`, `qcamd`/`qmicd` | **`$DEVICEROOT_REF`** — a deviceroot pulled off a working device |
 
-So this is not yet a from-scratch engine build: **WPE WebKit itself is still a prebuilt runtime.**
-Rebuilding it (`build-webkit-252.sh`, ~40 min, plus the `patches/`) is the remaining milestone; everything
-around it now reproduces.
+**As of 2026-07-25 WPE WebKit is also built from source** (§8) and `build-ipk-atlas.sh` ships it,
+falling back to `$DEVICEROOT_REF` only when no build is present. The final line of its output states
+which engine the package actually contains.
 
 **Get `$DEVICEROOT_REF`** — do this *before* removing the browser from a device, it is also your rollback
 artifact:
@@ -353,8 +382,67 @@ that is how the `stage-sysroot-atlas.sh` output was verified against the hand-as
 Add `-ffile-prefix-map=$STAGING=/staging` (and a `SOURCE_DATE_EPOCH`-derived date) if you ever need
 byte-reproducible output.
 
-### Not required for engine work
+## 8. Building WPE WebKit itself
 
-Rebuilding **WPE WebKit itself** (`build-webkit-252.sh`, ~40 min) is only needed when changing WebKit
-source or its `patches/`. For backend/BrowserServer changes you link against the WebKit libs pulled in
-step 3.
+Only needed when changing WebKit source or its `patches/` — for backend/BrowserServer work you link
+against the WebKit libs pulled in step 3. But this is what makes the build reproducible end-to-end
+instead of depending on a prebuilt engine runtime.
+
+```sh
+atlas-wpe-env/stage-hosttools-atlas.sh           # ruby + unifdef, unprivileged
+atlas-wpe-env/stage-sysroot-atlas.sh webkit-deps # 65 pinned armhf dev packages
+source atlas-wpe-env/env-atlas-cross.sh
+source atlas-wpe-env/hosttools-env.sh
+atlas-wpe-env/apply-webkit-patches.sh            # extract 2.52.4 + the Atlas series, in order
+atlas-wpe-env/build-webkit-atlas.sh configure
+atlas-wpe-env/build-webkit-atlas.sh build        # ~8500 targets
+```
+
+> **`build-webkit-252.sh` is not this.** That script disables VIDEO, GSTREAMER, WEBRTC and WEBGL — the
+> shipped engine plainly has all of them. It is an experiment, kept for reference. The feature set in
+> `build-webkit-atlas.sh` was reconstructed from the shipped `libWPEWebKit-2.0.so.1`: its 65 `NEEDED`
+> libraries and its symbol table (343 DFG references and zero CLoop → **JIT is on**, which is also why
+> `wpewebkit-2.52.4-softfp-jit.patch` exists).
+
+**Patch order matters.** `mediastream-camera` is authored on top of `mdpdetile-videosink`, and
+`webrtc-mono-opus` on top of `webrtc-receive-av`; applying them alphabetically fails.
+`apply-webkit-patches.sh` encodes the working order and is idempotent.
+
+**Dependencies are headers, not builds.** The engine links what the device already ships, so
+`webkit-deps` stages only dev headers and `.pc` files — 65 armhf packages pinned by version + sha256 in
+[`webkitdeps.list`](webkitdeps.list), fetched through an unprivileged apt root spanning
+bookworm/trixie/jammy. Versions track the **device's sonames**, not what is current:
+
+| Package | Pinned to | Because |
+|---------|-----------|---------|
+| `libicu-dev` | **70.1** (jammy) | ICU mangles every symbol with its major (`u_strToUpper_70`); any other ICU will not link against the device's `libicuuc.so.70` |
+| `libgstreamer1.0-dev` + plugins | **1.20.1** (jammy) | device ships GStreamer 1.20.7 |
+| `libjpeg62-turbo-dev` | Debian | device ships `libjpeg.so.62`; Ubuntu's is `libjpeg.so.8` |
+| `libcairo2-dev` | 1.18 (trixie) | device ships cairo 1.18.0 |
+
+About half the list is *transitive pkg-config providers* (libpcre2, brotli, expat, libdw, libunwind,
+orc, nghttp2, ffi, the X11 headers cairo's `.pc` references). They matter more than they look:
+
+> **`pkg-config --modversion` succeeding proves nothing.** Only `--cflags --libs` walks the transitive
+> `Requires:`. A missing `libpcre2-8.pc` surfaces as `Could NOT find Soup3: Found unsuitable version ".."`,
+> because WebKit's Find modules silently fall back to scraping version headers when pkg-config fails.
+> Also, `apt-get download` aborts the **entire batch** on one bad package name — fetch one at a time, or
+> you will believe you staged things you did not.
+
+**Four cross-build traps**, each worth a failed configure:
+
+1. **`unset CFLAGS CXXFLAGS LDFLAGS` before cmake.** `env-atlas-cross.sh` aims them at the BrowserServer
+   build, and `-L$STAGING/lib` puts the *device's* `libc.so` on the link line, shadowing the toolchain's
+   and leaving `__libc_csu_init` undefined — CMake's trivial-program check fails outright.
+2. **No `CMAKE_SYSROOT`.** `--sysroot` replaces the toolchain's own sysroot, so libc's headers stop
+   resolving. Dependency headers arrive as explicit `-I` from pkg-config instead.
+3. **`$STAGING/rootfs` must not be on the link path** — unlike the BrowserServer build. rootfs is the
+   device's *system* tree (glibc 2.8). Because `linklib` deliberately excludes libc/libpthread, ld falls
+   through to rootfs and picks up the 2.8 `libpthread.so.0`, whose `GLIBC_PRIVATE` symbols
+   (`__default_sa_restorer_v2`, `h_errno`, …) do not exist in glibc 2.23.
+4. **Add `/usr/include/<triplet>` explicitly.** Debian multiarch keeps `gpg-error.h`, `ffi.h`,
+   `jconfig.h`, `openssl/` and `libxslt/` there, and pkg-config never emits that directory.
+
+`CMAKE_INSTALL_PREFIX` is the **device** path (`/var/atlas252`, the short symlink `postinst` creates),
+with `DESTDIR` staging the tree locally. That bakes correct `PKGLIBEXECDIR`/`PKGLIBDIR` at build time,
+so the binary prefix-patching `deploy-252.sh` performs is no longer needed.

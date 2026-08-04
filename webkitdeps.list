@@ -1,0 +1,79 @@
+# WPE WebKit cross-build dependencies — armhf dev packages, pinned by version + sha256.
+# Generated from a working build; consumed by stage-sysroot-atlas.sh (phase: webkit-deps).
+#
+# Format:  <package>=<version>|<sha256>
+#
+# Suites are declared in stage-sysroot-atlas.sh's sources.list. Versions are chosen to MATCH THE
+# SONAMES THE DEVICE SHIPS, not to be current:
+#   libicu-dev 70.1        - ICU mangles every symbol with its major (u_strToUpper_70). Headers from
+#                            any other ICU will not link against the device's libicuuc.so.70.
+#   libgstreamer* 1.20.1   - device ships GStreamer 1.20.7
+#   libjpeg62-turbo-dev    - device ships libjpeg.so.62 (Debian naming; Ubuntu's is libjpeg.so.8)
+#   libcairo2-dev 1.18.4   - device ships cairo 1.18.0
+# Most of the rest are transitive pkg-config dependencies: without their .pc files, pkg-config fails
+# and WebKit's Find modules silently fall back to header-scraping and report bogus versions.
+flite1-dev=2.2-5|6076109eb9635c5c4bb71677c493a48ee3dc5445131e60b790f5fab40cecaff1
+libavif-dev=0.11.1-1+deb12u1|bceeeff7712c8db2d321ae04e8bcb3e37660a7b70d404cdf9aede471cd1de9d4
+libblkid-dev=2.38.1-5+deb12u3|9de5af89041cf2d5f4b95c4e231d1a36f894223a88f85841142fa4453905dd38
+libbrotli-dev=1.0.9-2+b6|5fe6b99d30abea044e5fafd67cf8d7adb13b0e5e48a78c5c52de68a5f9c819a9
+libbz2-dev=1.0.8-5+b1|c72759e3b4e9b7da8794bd247aefa597478e17e8df3f3f597ba7d9730296e4f3
+libcairo2-dev=1.18.4-1+b1|0d7405d5fce271f5bef1cd9e639f3943f2c71b3231eebc3c903294c4072e9c31
+libdw-dev=0.188-2.1|d17e9bdde5a445b6eacf440070a4df6f9bbee9d0b6acdad23cb87ebd7a621639
+libegl-dev=1.6.0-1|51a5deb65ec66157ed217a545bf3f2e28f620455e19f4a43761ee0292403243c
+libelf-dev=0.188-2.1|b5677ce5da56d47ceca4f63a17058b7e6ab862a5a095fa79a4d4e04749e1e831
+libepoxy-dev=1.5.10-1|713bda2bd0edeff62af151b28cdc389ba5aee62034267edd5d3f3978af82d506
+libexpat1-dev=2.5.0-1+deb12u2|c3d4fe8692b82f447be3ca310e4d9b75bd9be09067bf6bcd09407174884bdff8
+libffi-dev=3.4.4-1|063ae8a7cf5e7e9244f0913fcb322f5a3aff272ee974da6a4ce8bff932af801c
+libfontconfig-dev=2.14.1-4|a3f262e8a9fde23a6f2781d0d4405a5762929127b9fe63284cf57d06f542a316
+libfreetype-dev=2.12.1+dfsg-5+deb12u4|039711b58986b2a27e43571319eda4104fa411e00549f1e4ada7c903f13d7e44
+libgcrypt20-dev=1.10.1-3+deb12u1|b2e687b392871832cb37ae0815a41859ae139e2b3e6544e671333cab1345eeb0
+libgl-dev=1.6.0-1|6efd4d6ebc2dd24efc840d97bfef3cc7d172797d3b06c70dbcc0e315773315a0
+libgles-dev=1.6.0-1|07730e7e37dba80952f45242058762c177df366bbdcde9743fc87be51fc8467b
+libglib2.0-dev=2.74.6-2+deb12u9|c40d2bbff2f758a39ef2432468146b7e29af36e3cde349577e6e229a085fd752
+libglib2.0-dev-bin=2.74.6-2+deb12u9|46501aba0dc01a66f6fac2d7eed89c003ec7da179a8fdb64c5da0a980d7387f7
+libgpg-error-dev=1.46-1|112185bf23990175d4f7e6fc1017c52313523396b9e213ad949c1cf6cf6274a8
+libgraphite2-dev=1.3.14-1+deb12u1|ad9197464699f116cfa4658749e231ec2bdcea9ebfa1561ada96baffffe0a8ed
+libgstreamer1.0-dev=1.20.1-1|83cd39175ff45ca7dd6e26dad4af724f7004dd5f3557959bd09d4941616e7e4c
+libgstreamer-plugins-bad1.0-dev=1.20.1-1ubuntu2|4edae2efc04b0bfabfde640bbdeb5383a4ae62c9958c57dd9357ce1cb1ae9f29
+libgstreamer-plugins-base1.0-dev=1.20.1-1|8cac5b9139399e1bb14f843bc77b21f9ac1acfc77d005e923d5dd4750dcd46ad
+libgstreamer-plugins-good1.0-dev=1.20.1-1ubuntu1|92ae99ba1105b65d31cec4670c5959a37d65ea8091169497a5bfc462f5f33e44
+libharfbuzz-dev=6.0.0+dfsg-3|72ff3cda7f355f1a2754463d6a3a04dd9153dee27a9a5a2977a9e98aea452b4d
+libhwy-dev=1.0.3-3+deb12u1|e43aa38f74df5b0e54ce8757661ebcd280d9ab4a115c7502391f7429d10f635a
+libicu-dev=70.1-2|fa8476eb1352f5f6bafe46aadb3489319abf2b0c012e117ee46da12f8f41ddb1
+libjpeg62-turbo-dev=1:2.1.5-2|49fd2fe01e77f9e97f572fd2f4184f89d3f052e3bb712d011083a3baad72f74d
+libjxl-dev=0.7.0-10+deb12u1|a2880bb581790d37ab050407b7e202db3b94ab2050546cf9200937744df58720
+liblcms2-dev=2.14-2+deb12u1|1a353480ba2d2404b20cdfc870ab7b2b23d19badff9e53cf6c47d73f583b2a3c
+liblzma-dev=5.4.1-1+deb12u1|33680b21c5a648c47e27f310d4c8df0c15ad658704e58df44d21438fb6fbbb46
+libmount-dev=2.38.1-5+deb12u3|a2196a758e16ee0f810a224ab79ebb57994fe91388ca045f2fb6caa176c1dbed
+libnghttp2-dev=1.52.0-1+deb12u3|7f7220bf46b52ff1cc2849832aa34dd20af4b0f6e125b4f314da8afaeb1776af
+liborc-0.4-dev=1:0.4.33-2|64e591b5801144e87a8122822a05cd4c2c172d266ccabecdd8c52e12b9dbb835
+libpcre2-dev=10.42-1|878fdc77ee6ee3d11ada53c98bf576294c207e25bbb19c167b23917081277790
+libpixman-1-dev=0.42.2-1|98b1372bb846f4e39083f9cc55fd57e30992eaaa6b5c78f4b094323da8243caa
+libpng-dev=1.6.39-2+deb12u5|b5d8b45681688c8763c6e03fee8f142eb336bb4f68d680a9c25a8a8197658a64
+libpsl-dev=0.21.2-1|d073840bd50303a079c1ee7fce6d12ae07c0d751a49bbe2bd342943486d411f2
+libselinux1-dev=3.4-1+b6|882d6d82c31e57c69d91c7cb6e663f3c4e5eeb60ec11daefd14a046a95f39376
+libsepol-dev=3.4-2.1|35ee5aa71f5923cfa0edf54a93b256cf47e78212761e45db08c61f3c0f546633
+libsoup-3.0-dev=3.2.3-0+deb12u2|58178b710a210647abaff58b89211fed45bb418327f2cd96259633e3c3831f73
+libsqlite3-dev=3.40.1-2+deb12u2|57d42d7216a57608c1a4e859d4560132d466e523e3c5534a69ff752c3310a3ee
+libssl-dev=3.0.20-1~deb12u2|2454498e072aa19108c906e9a5e45c3dfc2c80266fe02cf7fd278b27d6faf0b5
+libsysprof-capture-4-dev=48.0-2|a0ce36edace112e8e7c8ab8377bbf0db7d63beba5825b427c3d5551470bc7f32
+libtasn1-6-dev=4.19.0-2+deb12u1|728e2bef058450ed25739b32c141353ee5f7e39e631f356b374d5608b96a02e3
+libunwind-dev=1.6.2-3|cd25f4f1b26cf4b5e6057da852512db0de9dcde8c256df16ae1454c63fbbd399
+libwayland-dev=1.21.0-1|74d7201dc1ca89e9b869559fb372d4f01689102d7c7df0116715c4b308bff996
+libwebp-dev=1.2.4-0.2+deb12u1|7ab89864239d3b0b92deedd91eeef603732f251cd30d41ef50dd1030fd3bff43
+libwoff-dev=1.0.2-2|fe658038877f6fec5af73cde9c15d53572a2478518bbd278dfa85692fa7379a8
+libwpe-1.0-dev=1.14.0-1|b5c97f41ac992f2d4a1a5391b7f8fea7d95ff7c58b49dda4cc9be5dff00450df
+libx11-dev=2:1.8.4-2+deb12u2|ab924f25aa1cc4fea0ad94c6c36f627d50b592507fd85b6fd3dae705244e64db
+libxau-dev=1:1.0.9-1|03b0fa700b9e62e298af77eacabd097dc16d1bd19ae34d82140ac4f20c10d5c5
+libxcb1-dev=1.15-1|602e69f7e452effc7b46ae53fc915ad325c8a769c5ec8d79dc043882fa77b0b6
+libxcb-render0-dev=1.15-1|d8ccc5b8f231a9c35a3e2e9218f8f91cf2b67aa24601bc92bb6c5261a40654a7
+libxcb-shm0-dev=1.15-1|35c592426630c4b366cbb6f94185426df31fba6b13f48c9f3bebf4cde43e271f
+libxdmcp-dev=1:1.1.2-3|8b4f46daf5dcf91180444812be90174ae10001dbe0a8fbdceaba73a12469aa62
+libxext-dev=2:1.3.4-1+b1|bd65822a11587918d25139fffbc30fc3b14d45138bdff95a96a68b48dfd3cfc6
+libxkbcommon-dev=1.5.0-1|22f86a1c6c1b535d1c071885c41547cb4ec4beeddea8e9fc209a91ca80bc807b
+libxml2-dev=2.9.14+dfsg-1.3~deb12u6|898c9cc0a634c35d2cb7553a41a0c6ff8f94d5d01e06d18745d6c4ce52c349c0
+libxrender-dev=1:0.9.10-1.1|de8197a246f582af096a4ffa24260b252597a7e844a774ff667c38b5178a5848
+libxslt1-dev=1.1.35-1+deb12u4|2cb0562bfccac98c250ad81a4b5271393a43d74439351875fb4c057254cdfbbc
+libzstd-dev=1.5.4+dfsg2-5|cc53a5dcc3b1b060a3df5766322ab0fdacae376f8f5bee30601f0276b8e87d60
+x11proto-dev=2022.1-1|3cab66a6591774188a568f9b54c4e7956f18da76e0e0fc4a779db5f6bcc3f148
+zlib1g-dev=1:1.2.13.dfsg-1|4fbb63530bb52324d74f42f6d69b6b1c6e3c09bd2cb84cecc121f688191e04f5

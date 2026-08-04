@@ -1,0 +1,21 @@
+--- a/Source/WebKit/WebProcess/WebPage/WebPage.cpp
++++ b/Source/WebKit/WebProcess/WebPage/WebPage.cpp
+@@ -4844,7 +4844,18 @@
+     m_selectionFlippingEnabled = store.getBoolValueForKey(WebPreferencesKey::selectionFlippingEnabledKey());
+ #endif
+ #if ENABLE(PAYMENT_REQUEST)
++#if ENABLE(APPLE_PAY)
+     settings.setPaymentRequestEnabled(store.getBoolValueForKey(WebPreferencesKey::applePayEnabledKey()));
++#else
++    /* Ports that build PAYMENT_REQUEST without APPLE_PAY (every non-Cocoa port, this one included)
++     * have no ApplePayEnabled preference: it is compiled out of the feature list, out of the
++     * set-by-name map, and defaults to false. Gating on it therefore hides window.PaymentRequest
++     * unconditionally, even though the whole Modules/paymentrequest implementation is built and
++     * linked in. Expose the API instead and let it behave normally - with no payment handler
++     * registered, canMakePayment() resolves false and show() rejects, which is the correct answer
++     * for a device that has no payment methods. */
++    settings.setPaymentRequestEnabled(true);
++#endif
+ #endif
+ 
+ #if PLATFORM(IOS_FAMILY)

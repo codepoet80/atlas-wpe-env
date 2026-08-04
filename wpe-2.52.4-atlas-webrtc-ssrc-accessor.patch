@@ -1,0 +1,60 @@
+--- a/Source/WebCore/platform/mediastream/gstreamer/RealtimeOutgoingMediaSourceGStreamer.h
++++ b/Source/WebCore/platform/mediastream/gstreamer/RealtimeOutgoingMediaSourceGStreamer.h
+@@ -58,6 +58,12 @@
+     GRefPtr<GstWebRTCRTPSender> sender() const { return m_sender; }
+     GRefPtr<GstElement> bin() const { return m_bin; }
+ 
++    // Stable per-sender SSRC, generated once at construction. GStreamerMediaEndpoint stamps it into the
++    // codec caps so webrtcbin emits a=ssrc in the OFFER, and allowedCaps() reuses it on the send path so
++    // the payloader does not mint a different one (see the atlas webrtc-receive-av / sendpath-ssrc
++    // patches, both of which reference this).
++    uint32_t ssrc() const { return m_ssrc; }
++
+     bool configurePacketizers(GRefPtr<GstCaps>&&);
+ 
+     GUniquePtr<GstStructure> parameters();
+@@ -120,6 +126,7 @@
+     GRefPtr<GstWebRTCRTPSender> m_sender;
+     GRefPtr<GstPad> m_webrtcSinkPad;
+     RefPtr<UniqueSSRCGenerator> m_ssrcGenerator;
++    uint32_t m_ssrc { 0 };
+     GUniquePtr<GstStructure> m_parameters;
+     RTPHeaderExtensionMapping m_rtpHeaderExtensionMapping;
+     Vector<RefPtr<GStreamerRTPPacketizer>> m_packetizers;
+--- a/Source/WebCore/platform/mediastream/gstreamer/RealtimeOutgoingMediaSourceGStreamer.cpp
++++ b/Source/WebCore/platform/mediastream/gstreamer/RealtimeOutgoingMediaSourceGStreamer.cpp
+@@ -81,6 +81,12 @@
+         GST_DEBUG_CATEGORY_INIT(webkit_webrtc_outgoing_media_debug, "webkitwebrtcoutgoingmedia", 0, "WebKit WebRTC outgoing media");
+     });
+ 
++    // Generate this sender's stable SSRC once, up front. It has to exist before the first OFFER is
++    // built (GStreamerMediaEndpoint reads it via ssrc() to stamp a=ssrc onto the codec caps), which is
++    // well before any packetizer is created, so it cannot be taken from the packetizer.
++    if (m_ssrcGenerator)
++        m_ssrc = m_ssrcGenerator->generateSSRC();
++
+     m_bin = gst_bin_new(nullptr);
+     m_inputSelector = gst_element_factory_make("input-selector", nullptr);
+     g_object_set(m_inputSelector.get(), "sync-streams", FALSE, nullptr);
+@@ -481,6 +487,21 @@
+     if (gst_caps_is_empty(codecPreferences.get()) || gst_caps_is_any(codecPreferences.get())) [[unlikely]]
+         return false;
+ 
++    // Stamp this sender's stable SSRC (the one already signalled as a=ssrc in the LOCAL SDP via
++    // allowedCaps()) onto every codec structure, so the packetizer's payloader emits RTP carrying the
++    // SAME ssrc webrtcbin negotiated. The transceiver's post-negotiation codec-preferences do NOT carry
++    // it back (a=ssrc lives on the SDP media, not the codec structure), so without this the payloader
++    // mints its own ssrc: webrtcbin's send pad then sees an unexpected ssrc, never forwards the RTP,
++    // and the resulting backpressure stalls the encoder -> packetsSent stays 0. See GStreamer{Audio,
++    // Video}RTPPacketizer::create(), which reuses a pre-set "ssrc" field instead of generating one.
++    if (m_ssrc) {
++        codecPreferences = adoptGRef(gst_caps_make_writable(codecPreferences.leakRef()));
++        unsigned totalStructures = gst_caps_get_size(codecPreferences.get());
++        for (unsigned i = 0; i < totalStructures; i++)
++            gst_structure_set(gst_caps_get_structure(codecPreferences.get(), i), "ssrc", G_TYPE_UINT, m_ssrc, nullptr);
++        GST_DEBUG_OBJECT(m_bin.get(), "Stamped sender SSRC %u onto codec preferences: %" GST_PTR_FORMAT, m_ssrc, codecPreferences.get());
++    }
++
+     auto inputSelectorSrcPad = adoptGRef(gst_element_get_static_pad(m_inputSelector.get(), "src"));
+     if (!gst_pad_is_linked(inputSelectorSrcPad.get()) && !gst_element_link(m_inputSelector.get(), m_tee.get()))
+         return false;
