@@ -4,7 +4,8 @@
 # ($WPE/env-glibc-gcc125.sh, staging-glibc-252, the wpewebkit _b build dir, camera-path-a).
 #
 #   source env-atlas-cross.sh
-#   ./build-ipk-atlas.sh                 # -> $OUT/org.webosports.app.atlas_<ver>_all.ipk
+#   ./build-ipk-atlas.sh                 # -> $OUT/<target>/org.webosports.app.atlas_<ver>_all.ipk
+#   ./build-ipk-feed.sh / ./build-ipk-standalone.sh   # the two distribution targets (see ATLAS_PKG_TARGET)
 #   DOSTRIP=0 ./build-ipk-atlas.sh       # keep symbols (bigger ipk, for gdb)
 #
 # WHAT COMES FROM WHERE  (see BUILDING.md §7):
@@ -29,6 +30,18 @@ BACKEND="${BACKEND:-$REPOS/atlas-wpe-backend/libWPEBackend-atlas.so}"
 DEVICEROOT_REF="${DEVICEROOT_REF:-$HOME/atlas-device-backup/ref/org.webosports.app.atlas/deviceroot}"
 OUT="${OUT:-$HOME/atlas-ipk}"
 DOSTRIP="${DOSTRIP:-1}"
+# Packaging target. The PAYLOAD (data.tar.gz) is identical either way — only control.tar.gz differs, so a
+# feed can index the same engine bits without repacking anything.
+#   standalone (default) : postinst/prerm restart LunaSysMgr themselves (WOQI / by-hand installs, where
+#                          there is no installer to defer to). No Depends — nothing else to resolve them.
+#   feed                 : postinst/prerm must NOT restart Luna (it would kill a batch installer running
+#                          under it); instead declare PostInstallFlags=RestartLuna, and depend on the
+#                          feed's OpenSSL 1.1 package so /usr/lib/ssl11 gets pulled in.
+# Use the wrappers build-ipk-feed.sh / build-ipk-standalone.sh, or set ATLAS_PKG_TARGET here.
+ATLAS_PKG_TARGET="${ATLAS_PKG_TARGET:-standalone}"
+case "$ATLAS_PKG_TARGET" in feed|standalone) ;; *) echo "build-ipk-atlas: ATLAS_PKG_TARGET must be 'feed' or 'standalone' (got '$ATLAS_PKG_TARGET')" >&2; exit 1 ;; esac
+# The package a feed build depends on for OpenSSL 1.1 (/usr/lib/ssl11). Override for another feed.
+FEED_DEPENDS="${FEED_DEPENDS:-org.webosarchive.tls-updates}"
 APPNAME=org.webosports.app.atlas
 CRYPTO_DR="/media/cryptofs/apps/usr/palm/applications/$APPNAME/deviceroot"
 
@@ -51,6 +64,7 @@ VER=$(grep -oE '"version"[[:space:]]*:[[:space:]]*"[0-9.]+"' "$APPSRC/appinfo.js
 WORKROOT=$(mktemp -d); trap 'rm -rf "$WORKROOT"' EXIT
 APP="$WORKROOT/usr/palm/applications/$APPNAME"
 D="$APP/deviceroot/wpe-252"; A="$APP/deviceroot/atlas"
+OUT="$OUT/$ATLAS_PKG_TARGET"   # same canonical filename per target, kept apart so one cannot clobber the other
 mkdir -p "$APP" "$OUT"
 
 echo "=== 1. app front-end from source ($APPSRC) ==="
@@ -184,7 +198,25 @@ fi
 
 echo "=== 7. data.tar.gz ==="
 INSTALLED_KB=$(du -sk "$WORKROOT/usr" | awk '{print $1}')
-( cd "$WORKROOT" && tar czf "$OUT/data.tar.gz" --owner=0 --group=0 ./usr )
+# Reproducible payload: stamp every member with one epoch and emit members in name order, so two builds
+# of the same source produce a BYTE-IDENTICAL data.tar.gz. Without this the ~300 files we copy fresh each
+# run carry the build clock, so every rebuild churns the ipk's md5 and a feed has to re-stanza a package
+# whose contents did not actually change (measured: feed vs standalone build differed in 300 mtimes and
+# ZERO bytes of content). It also makes the two packaging targets differ in control.tar.gz only.
+#
+# The stamp is the app repo's HEAD commit time, deliberately NOT a fixed constant: GStreamer invalidates
+# its cached plugin registry by plugin .so mtime, so the stamp has to keep changing from release to
+# release or an upgraded engine could be left running against a stale registry. Override with
+# SOURCE_DATE_EPOCH; falls back to the build clock outside a git checkout (non-reproducible, as before).
+SOURCE_DATE_EPOCH="${SOURCE_DATE_EPOCH:-$(git -C "$APPSRC" log -1 --format=%ct 2>/dev/null || true)}"
+if [ -n "$SOURCE_DATE_EPOCH" ]; then
+  echo "   reproducible: stamping payload mtimes @$SOURCE_DATE_EPOCH (app HEAD)"
+  ( cd "$WORKROOT" && tar czf "$OUT/data.tar.gz" --owner=0 --group=0 \
+      --sort=name --mtime="@$SOURCE_DATE_EPOCH" ./usr )
+else
+  echo "   WARN: no git checkout at $APPSRC and no SOURCE_DATE_EPOCH — payload mtimes are the build clock"
+  ( cd "$WORKROOT" && tar czf "$OUT/data.tar.gz" --owner=0 --group=0 ./usr )
+fi
 
 echo "=== 8. control.tar.gz ==="
 CTRL="$WORKROOT/CONTROL"; mkdir -p "$CTRL"
@@ -199,16 +231,28 @@ Maintainer: WebOS Ports <webos-ports@googlegroups.com>
 Description: Atlas Web — WPE WebKit 2.52 browser for webOS (HP TouchPad).
 webOS-Package-Format-Version: 2
 webOS-Packager-Version: 3.0.5b38
+EOF
+if [ "$ATLAS_PKG_TARGET" = feed ]; then
+  # Depends: the feed's own OpenSSL 1.1 package — Atlas links /usr/lib/ssl11 for HTTPS, which a stock
+  # webOS 3.0.x device does not have. Only meaningful where that package exists, hence feed-only.
+  # Source: postinst/prerm deliberately do NOT restart LunaSysMgr in a feed build (it would kill a batch
+  # installer running under it), so the reload is declared here for the installer to do once, at the end.
+  # NOTE: Preware reads these flags from the FEED's Packages index Source block, not from this control —
+  # a distributor must carry them into their stanza too. Emitting them keeps the ipk self-describing.
+  # The display half of Source (Feed, Category, Title, FullDescription, Icon, DeviceCompatibility,
+  # LastUpdated) stays out: that is per-feed catalog metadata, not a property of this package.
+  cat >> "$CTRL/control" <<EOF
+Depends: $FEED_DEPENDS
 Source: { "PostInstallFlags":"RestartLuna", "PostUpdateFlags":"RestartLuna", "PostRemoveFlags":"RestartLuna" }
 EOF
-# The Source line above declares what postinst/prerm deliberately no longer do themselves: LunaSysMgr has
-# to reload to pick up the NPAPI plugin, but doing it inline kills batch installers (Preware runs under
-# LunaSysMgr — see the comment in ipk-postinst.sh). Preware reads these flags from the FEED's Packages
-# index Source block, not from this control, so a distributor must carry them over into their stanza —
-# emitting them here keeps the ipk self-describing and gives them something to copy. Feed-specific keys
-# (Feed, Category, Title, Icon, Depends on a feed's own OpenSSL package) deliberately stay out of here.
+fi
 cp "$ENV_DIR/ipk-postinst.sh" "$CTRL/postinst"; chmod 755 "$CTRL/postinst"
 cp "$ENV_DIR/ipk-prerm.sh"    "$CTRL/prerm";    chmod 755 "$CTRL/prerm"
+# Stamp the target into both scripts (they default to standalone when run straight from the repo).
+for s in postinst prerm; do
+  sed -i "s/^PKG_TARGET=.*/PKG_TARGET=$ATLAS_PKG_TARGET/" "$CTRL/$s"
+  grep -q "^PKG_TARGET=$ATLAS_PKG_TARGET$" "$CTRL/$s" || die "failed to stamp PKG_TARGET into $s"
+done
 ( cd "$CTRL" && tar czf "$OUT/control.tar.gz" --owner=0 --group=0 ./control ./postinst ./prerm )
 
 echo "=== 9. ar the ipk ==="
