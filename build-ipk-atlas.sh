@@ -126,6 +126,22 @@ chmod 755 "$D/BrowserServer-atlas" "$A/BrowserServer" 2>/dev/null || true
 chmod 755 "$A"/qcamd "$A"/qmicd "$A"/qspkd "$A"/atlas-sensord 2>/dev/null || true
 
 echo "=== 5. sanity guards (fail loud rather than ship a broken browser) ==="
+# GPU driver: ship all three names the engine asks for. postinst re-copies the DEVICE's own driver over
+# these at install time, but the package must be self-sufficient — an ipk that omits them installs a
+# browser that renders nothing if /usr/lib has no unversioned libEGL.so (the 0.9.8 field report).
+# These come in via the reference deviceroot, which is only correct because it was pulled from a device
+# where postinst had already staged them; guard it rather than keep relying on that provenance.
+if [ -s "$D/lib/libEGL.so.1" ] && [ ! -s "$D/lib/libEGL.so" ]; then
+  # The vendor libGLESv2 blob NEEDs the UNVERSIONED name (its own SONAME is libEGL.so too).
+  cp -f "$D/lib/libEGL.so.1" "$D/lib/libEGL.so"
+  echo "   staged unversioned libEGL.so (vendor libGLESv2 NEEDs it)"
+fi
+for gl in libEGL.so.1 libGLESv2.so.2 libEGL.so; do
+  [ -s "$D/lib/$gl" ] || die "GPU driver $gl missing from the payload — a fresh install would render nothing.
+       Copy the device's Adreno driver into the reference deviceroot:
+         /usr/lib/libEGL.so -> \$DEVICEROOT_REF/wpe-252/lib/libEGL.so.1 (and libEGL.so)
+         /usr/lib/libGLESv2.so -> \$DEVICEROOT_REF/wpe-252/lib/libGLESv2.so.2"
+done
 # The engine links versioned GPU sonames; postinst copies the device's real Adreno driver over these.
 for f in "$D/lib/libWPEWebKit-2.0.so.1" "$D/libexec/wpe-webkit-2.0/WPEWebProcess" \
          "$D/libexec/wpe-webkit-2.0/WPENetworkProcess" "$D/lib/wpe-webkit-2.0/injected-bundle/libWPEInjectedBundle.so"; do
