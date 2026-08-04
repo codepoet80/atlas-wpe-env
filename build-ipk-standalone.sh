@@ -7,6 +7,6 @@
 #     install fail. OpenSSL 1.1 (/usr/lib/ssl11) still has to be installed separately for HTTPS to work —
 #     postinst warns when it is missing.
 #
-#   ./build-ipk-standalone.sh   # -> $OUT/standalone/org.webosports.app.atlas_<ver>_all.ipk
+#   ./build-ipk-standalone.sh   # -> atlas-browser-app/ipks/standalone/org.webosports.app.atlas_<ver>_all.ipk
 set -eu
 exec env ATLAS_PKG_TARGET=standalone "$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)/build-ipk-atlas.sh" "$@"

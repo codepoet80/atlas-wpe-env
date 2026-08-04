@@ -12,6 +12,6 @@
 # NOTE: Preware reads the restart flags from the FEED's Packages index "Source" block, not from the ipk's
 # control — copy them into your stanza as well.
 #
-#   ./build-ipk-feed.sh        # -> $OUT/feed/org.webosports.app.atlas_<ver>_all.ipk
+#   ./build-ipk-feed.sh        # -> atlas-browser-app/ipks/feed/org.webosports.app.atlas_<ver>_all.ipk
 set -eu
 exec env ATLAS_PKG_TARGET=feed "$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)/build-ipk-atlas.sh" "$@"

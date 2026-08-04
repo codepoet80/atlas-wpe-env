@@ -298,7 +298,8 @@ which cannot run outside Herrie's tree (they source the unpublished `env-glibc-g
 
 ```sh
 source atlas-wpe-env/env-atlas-cross.sh
-atlas-wpe-env/build-ipk-atlas.sh              # -> ~/atlas-ipk/org.webosports.app.atlas_<ver>_all.ipk
+atlas-wpe-env/build-ipk-standalone.sh         # -> atlas-browser-app/ipks/standalone/org.webosports.app.atlas_<ver>_all.ipk
+atlas-wpe-env/build-ipk-feed.sh               # -> atlas-browser-app/ipks/feed/... (Preware feed build)
 DOSTRIP=0 atlas-wpe-env/build-ipk-atlas.sh    # keep symbols, for gdb
 ```
 
@@ -340,7 +341,7 @@ the bundled `ld-linux.so.3`.
 Headless over novacom, using the same appinstaller service those front-ends use:
 
 ```sh
-novacom put file:///media/internal/atlas.ipk < ~/atlas-ipk/org.webosports.app.atlas_0.9.7_all.ipk
+novacom put file:///media/internal/atlas.ipk < ~/Projects/atlas-browser-app/ipks/standalone/org.webosports.app.atlas_0.9.9_all.ipk
 # then, ON THE DEVICE (see the -n warning below):
 luna-send -n 20 -f palm://com.palm.appinstaller/installNoVerify \
   '{"target":"/media/internal/atlas.ipk","subscribe":true,"uncompressedSize":214232}' > /tmp/reply.log 2>&1 &

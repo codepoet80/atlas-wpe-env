@@ -4,7 +4,7 @@
 # ($WPE/env-glibc-gcc125.sh, staging-glibc-252, the wpewebkit _b build dir, camera-path-a).
 #
 #   source env-atlas-cross.sh
-#   ./build-ipk-atlas.sh                 # -> $OUT/<target>/org.webosports.app.atlas_<ver>_all.ipk
+#   ./build-ipk-atlas.sh                 # -> atlas-browser-app/ipks/<target>/org.webosports.app.atlas_<ver>_all.ipk
 #   ./build-ipk-feed.sh / ./build-ipk-standalone.sh   # the two distribution targets (see ATLAS_PKG_TARGET)
 #   DOSTRIP=0 ./build-ipk-atlas.sh       # keep symbols (bigger ipk, for gdb)
 #
@@ -28,7 +28,9 @@ APPSRC="${APPSRC:-$REPOS/atlas-browser-app}"
 BLD="${BLD:-$REPOS/browserserver-build}"
 BACKEND="${BACKEND:-$REPOS/atlas-wpe-backend/libWPEBackend-atlas.so}"
 DEVICEROOT_REF="${DEVICEROOT_REF:-$HOME/atlas-device-backup/ref/org.webosports.app.atlas/deviceroot}"
-OUT="${OUT:-$HOME/atlas-ipk}"
+# Built ipks land in the app repo's ipks/, which is TRACKED — the released artifacts are committed
+# alongside the source they were built from. Per-target subdirectory is appended below.
+OUT="${OUT:-$APPSRC/ipks}"
 DOSTRIP="${DOSTRIP:-1}"
 # Packaging target. The PAYLOAD (data.tar.gz) is identical either way — only control.tar.gz differs, so a
 # feed can index the same engine bits without repacking anything.
