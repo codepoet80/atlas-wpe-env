@@ -199,7 +199,14 @@ Maintainer: WebOS Ports <webos-ports@googlegroups.com>
 Description: Atlas Web — WPE WebKit 2.52 browser for webOS (HP TouchPad).
 webOS-Package-Format-Version: 2
 webOS-Packager-Version: 3.0.5b38
+Source: { "PostInstallFlags":"RestartLuna", "PostUpdateFlags":"RestartLuna", "PostRemoveFlags":"RestartLuna" }
 EOF
+# The Source line above declares what postinst/prerm deliberately no longer do themselves: LunaSysMgr has
+# to reload to pick up the NPAPI plugin, but doing it inline kills batch installers (Preware runs under
+# LunaSysMgr — see the comment in ipk-postinst.sh). Preware reads these flags from the FEED's Packages
+# index Source block, not from this control, so a distributor must carry them over into their stanza —
+# emitting them here keeps the ipk self-describing and gives them something to copy. Feed-specific keys
+# (Feed, Category, Title, Icon, Depends on a feed's own OpenSSL package) deliberately stay out of here.
 cp "$ENV_DIR/ipk-postinst.sh" "$CTRL/postinst"; chmod 755 "$CTRL/postinst"
 cp "$ENV_DIR/ipk-prerm.sh"    "$CTRL/prerm";    chmod 755 "$CTRL/prerm"
 ( cd "$CTRL" && tar czf "$OUT/control.tar.gz" --owner=0 --group=0 ./control ./postinst ./prerm )
